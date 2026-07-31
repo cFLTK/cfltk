@@ -24,7 +24,16 @@ under an isolated X11 display):
 | `Fl_Group` | `include/cfltk/Fl_Group.h`, `src/core/Fl_Group.c` |
 | `Fl_Window` | `include/cfltk/Fl_Window.h`, `src/widgets/Fl_Window.c` |
 | `Fl_Box` | `include/cfltk/Fl_Box.h`, `src/widgets/Fl_Box.c` |
+| `Fl_Button` | `include/cfltk/Fl_Button.h`, `src/widgets/Fl_Button.c` |
+| `Fl_Toggle_Button` | `include/cfltk/Fl_Toggle_Button.h`, `src/widgets/Fl_Toggle_Button.c` |
+| `Fl_Radio_Button` | `include/cfltk/Fl_Radio_Button.h`, `src/widgets/Fl_Radio_Button.c` |
+| `Fl_Light_Button` + `Fl_Radio_Light_Button` | `include/cfltk/Fl_Light_Button.h`, `src/widgets/Fl_Light_Button.c` |
+| `Fl_Round_Button` + `Fl_Radio_Round_Button` | `include/cfltk/Fl_Round_Button.h`, `src/widgets/Fl_Round_Button.c` |
+| `Fl_Check_Button` | `include/cfltk/Fl_Check_Button.h`, `src/widgets/Fl_Check_Button.c` |
+| `Fl_Return_Button` | `include/cfltk/Fl_Return_Button.h`, `src/widgets/Fl_Return_Button.c` |
+| `Fl_Repeat_Button` | `include/cfltk/Fl_Repeat_Button.h`, `src/widgets/Fl_Repeat_Button.c` |
 | `Fl` (static class) | `include/cfltk/Fl.h`, `src/core/Fl.c` |
+| Timers (`Fl::add_timeout` etc.) | `include/cfltk/Fl.h`, `src/core/Fl.c` (fixed 32-slot pool, no per-timer heap allocation) |
 | `fl_draw.H` free functions | `include/cfltk/fl_draw.h`, `src/draw/fl_draw.c` |
 | `Enumerations.H` | `include/cfltk/Enumerations.h` |
 | default color map | `include/cfltk/fl_colormap.h`, `src/draw/fl_colormap.c` |
@@ -75,6 +84,22 @@ under an isolated X11 display):
   `Fl_Group_begin()` but leave closing the group (`Fl_Group_end()`) to
   the caller. This is what lets `examples/hello` build its tree by
   simply constructing widgets in order, exactly like the C++ original.
+- **Subclasses that add no fields reuse the parent's struct outright.**
+  Several upstream classes exist purely to run different constructor
+  logic (and, for the `_Light_Button` family, different `draw()`/
+  `handle()`) over the *same* private fields as their base class --
+  `Fl_Toggle_Button`/`Fl_Radio_Button` add nothing to `Fl_Button`;
+  `Fl_Round_Button`/`Fl_Check_Button` add nothing to `Fl_Light_Button`.
+  cfltk does not generate a new struct for these: `Fl_Toggle_Button_new()`
+  is a factory function returning a plain `Fl_Button*` with `type()`
+  pre-set, not a distinct type. This mirrors upstream's actual memory
+  layout (a `Fl_Toggle_Button` *is* an `Fl_Button` with one field
+  different) more directly than inventing an empty wrapper struct would,
+  and avoids the "no duplicated code" the contract asks to avoid. Only
+  classes that change *behavior* (a different `Fl_WidgetOps`, i.e.
+  `Fl_Light_Button` and `Fl_Return_Button`) get their own vtable; classes
+  that change neither fields nor behavior, only constructor defaults,
+  don't even need that.
 - **Colors/box types/events are numerically unchanged.** `Enumerations.h`
   preserves every enumerator's integer value from `FL/Enumerations.H`,
   and `fl_colormap.c` reproduces upstream's 256-entry default palette
@@ -98,6 +123,23 @@ under an isolated X11 display):
   default for embedded targets, on by default for the Linux backend.
 - **No images** (`Fl_Image` is an opaque forward declaration only).
   `Fl_Label`'s `image`/`deimage` fields exist but are never read.
+- **Timers exist (`Fl_add_timeout`/`Fl_repeat_timeout`/`Fl_remove_timeout`),
+  but `Fl::add_fd()` does not.** `Fl_wait_for()` clamps its backend wait
+  to the earliest pending deadline and fires expired timeouts before
+  flushing; there is no way yet to also wake on an arbitrary file
+  descriptor becoming readable (would need `select()`'s fd_set extended
+  past the X11 connection in `fl_x11_event.c`).
+- **No color schemes** (upstream's `Fl::scheme("gtk+"/"plastic"/"gleam")`).
+  `Fl_Light_Button`'s indicator always renders via the plain
+  `FL_THIN_DOWN_BOX` + `fl_pie()` path; the box-type families those
+  schemes need (`_FL_GTK_*`, `_FL_PLASTIC_*`, `_FL_GLEAM_*`) already fall
+  back to `fl_up_box`/`fl_border_frame` per the box-type note above.
+- **Shortcuts are ASCII-only.** `Fl_Widget_label_shortcut()` /
+  `Fl_Widget_test_shortcut()` (the `'&x'` label shortcut) and
+  `Fl_test_shortcut()` (the explicit `Fl_Button_shortcut()` value) both
+  decode a single byte instead of a full UTF-8 code point, since
+  `fl_utf8decode()` hasn't been ported. Only matters for non-ASCII
+  shortcut letters.
 - **Labels**: only `FL_NORMAL_LABEL` actually draws differently from
   `FL_NO_LABEL`; shadow/engraved/embossed/icon/image label types parse
   but render as plain text. `fl_label_draw()` in `src/draw/fl_draw.c`
@@ -115,9 +157,8 @@ under an isolated X11 display):
 
 ## Next phases (not started)
 
-1. More widgets: the `Fl_Button` family, `Fl_Input`/text fields, menus,
-   `Fl_Valuator` family, `Fl_Browser_`, `Fl_Tabs`, `Fl_Scroll`,
-   `Fl_Text_Buffer`/`Fl_Text_Editor`.
+1. More widgets: `Fl_Input`/text fields, menus, `Fl_Valuator` family,
+   `Fl_Browser_`, `Fl_Tabs`, `Fl_Scroll`, `Fl_Text_Buffer`/`Fl_Text_Editor`.
 2. `Fl_Image` + image loaders (behind a compile-time switch).
 3. The rest of the official FLTK example suite (see the contract's
    "Required Validation Programs" list), each one both a port target
