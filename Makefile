@@ -20,6 +20,13 @@ CORE_SRCS := \
     src/widgets/Fl_Check_Button.c \
     src/widgets/Fl_Return_Button.c \
     src/widgets/Fl_Repeat_Button.c \
+    src/widgets/Fl_Input.c \
+    src/widgets/Fl_Float_Input.c \
+    src/widgets/Fl_Int_Input.c \
+    src/widgets/Fl_Multiline_Input.c \
+    src/widgets/Fl_Secret_Input.c \
+    src/widgets/Fl_Output.c \
+    src/widgets/Fl_Multiline_Output.c \
     src/draw/fl_draw.c \
     src/draw/fl_colormap.c
 
@@ -51,6 +58,7 @@ examples: $(LIB)
 	$(CC) $(CFLAGS) examples/hello/hello.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/hello
 	$(CC) $(CFLAGS) examples/buttons/buttons.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/buttons
 	$(CC) $(CFLAGS) examples/radio/radio.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/radio
+	$(CC) $(CFLAGS) examples/input/input.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/input
 
 clean:
 	rm -f $(OBJS) $(LIB)

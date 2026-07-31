@@ -32,8 +32,16 @@ under an isolated X11 display):
 | `Fl_Check_Button` | `include/cfltk/Fl_Check_Button.h`, `src/widgets/Fl_Check_Button.c` |
 | `Fl_Return_Button` | `include/cfltk/Fl_Return_Button.h`, `src/widgets/Fl_Return_Button.c` |
 | `Fl_Repeat_Button` | `include/cfltk/Fl_Repeat_Button.h`, `src/widgets/Fl_Repeat_Button.c` |
+| `Fl_Input_` + `Fl_Input` | `include/cfltk/Fl_Input.h`, `src/widgets/Fl_Input.c` (merged, see header) |
+| `Fl_Float_Input` | `include/cfltk/Fl_Float_Input.h`, `src/widgets/Fl_Float_Input.c` |
+| `Fl_Int_Input` | `include/cfltk/Fl_Int_Input.h`, `src/widgets/Fl_Int_Input.c` |
+| `Fl_Multiline_Input` | `include/cfltk/Fl_Multiline_Input.h`, `src/widgets/Fl_Multiline_Input.c` |
+| `Fl_Secret_Input` | `include/cfltk/Fl_Secret_Input.h`, `src/widgets/Fl_Secret_Input.c` |
+| `Fl_Output` | `include/cfltk/Fl_Output.h`, `src/widgets/Fl_Output.c` |
+| `Fl_Multiline_Output` | `include/cfltk/Fl_Multiline_Output.h`, `src/widgets/Fl_Multiline_Output.c` |
 | `Fl` (static class) | `include/cfltk/Fl.h`, `src/core/Fl.c` |
 | Timers (`Fl::add_timeout` etc.) | `include/cfltk/Fl.h`, `src/core/Fl.c` (fixed 32-slot pool, no per-timer heap allocation) |
+| Clipboard (`Fl::copy`/`Fl::paste`) | `include/cfltk/Fl.h`, `src/core/Fl.c` (in-process only, see Known differences) |
 | `fl_draw.H` free functions | `include/cfltk/fl_draw.h`, `src/draw/fl_draw.c` |
 | `Enumerations.H` | `include/cfltk/Enumerations.h` |
 | default color map | `include/cfltk/fl_colormap.h`, `src/draw/fl_colormap.c` |
@@ -116,11 +124,13 @@ under an isolated X11 display):
   CMake option, in a later phase.
 - **No grab()/modal() stack.** Popup menus and modal dialogs need this;
   `Fl_context_handle()` in `Fl.c` is the seam where it will be added.
-- **No drag-and-drop, no clipboard, no tooltips.** Event codes exist
-  (`FL_DND_*`, `FL_PASTE`, `FL_SELECTIONCLEAR`) but nothing produces or
-  consumes them yet. Match the contract's "optional compile-time
-  configuration to disable" list — these will be CMake options, off by
-  default for embedded targets, on by default for the Linux backend.
+- **No drag-and-drop, no tooltips.** Event codes exist (`FL_DND_*`,
+  `FL_SELECTIONCLEAR`) but nothing produces or consumes them yet. Match
+  the contract's "optional compile-time configuration to disable" list
+  — these will be CMake options, off by default for embedded targets,
+  on by default for the Linux backend. Clipboard (`FL_PASTE`) exists as
+  of `Fl_Input`, but only in-process (see below) — it does not claim
+  X11 selection ownership or answer other applications' paste requests.
 - **No images** (`Fl_Image` is an opaque forward declaration only).
   `Fl_Label`'s `image`/`deimage` fields exist but are never read.
 - **Timers exist (`Fl_add_timeout`/`Fl_repeat_timeout`/`Fl_remove_timeout`),
@@ -129,6 +139,21 @@ under an isolated X11 display):
   flushing; there is no way yet to also wake on an arbitrary file
   descriptor becoming readable (would need `select()`'s fd_set extended
   past the X11 connection in `fl_x11_event.c`).
+- **`Fl_Input_`/`Fl_Input` are merged into one struct/file** (`Fl_Input.h`/
+  `.c`), unlike the button-family pattern of reusing a struct across
+  *separate* files. Upstream splits them so people can subclass
+  `Fl_Input_` with different key bindings while reusing all the field/
+  buffer/selection machinery; cfltk has no such subclass yet, so the
+  split has no payoff today. If one is needed later, `fl_input_ops`'s
+  `handle` is the only piece that would need to move to a new file --
+  the fields already model exactly what `Fl_Input_` held.
+- **`Fl_Input` has no undo/redo, no word-wrap, no `^X` control-character
+  display expansion, and no IME/composition support.** Cursor motion and
+  `replace()` are byte-oriented, not UTF-8-character-oriented (multi-byte
+  characters are treated as atomic units for *click positioning* via a
+  lightweight UTF-8 length check, but not elsewhere). `FL_SECRET_INPUT`
+  masks with ASCII `*` instead of upstream's Unicode bullet. See
+  `Fl_Input.h` for the full list.
 - **No color schemes** (upstream's `Fl::scheme("gtk+"/"plastic"/"gleam")`).
   `Fl_Light_Button`'s indicator always renders via the plain
   `FL_THIN_DOWN_BOX` + `fl_pie()` path; the box-type families those
@@ -157,7 +182,8 @@ under an isolated X11 display):
 
 ## Next phases (not started)
 
-1. More widgets: `Fl_Input`/text fields, menus, `Fl_Valuator` family,
+1. More widgets: menus (`Fl_Menu_`, `Fl_Menu_Button`, `Fl_Choice`,
+   `Fl_Menu_Bar`), `Fl_Valuator` family (sliders, dials, counters),
    `Fl_Browser_`, `Fl_Tabs`, `Fl_Scroll`, `Fl_Text_Buffer`/`Fl_Text_Editor`.
 2. `Fl_Image` + image loaders (behind a compile-time switch).
 3. The rest of the official FLTK example suite (see the contract's

@@ -32,6 +32,13 @@ set(CFLTK_CORE_SOURCES
     src/widgets/Fl_Check_Button.c
     src/widgets/Fl_Return_Button.c
     src/widgets/Fl_Repeat_Button.c
+    src/widgets/Fl_Input.c
+    src/widgets/Fl_Float_Input.c
+    src/widgets/Fl_Int_Input.c
+    src/widgets/Fl_Multiline_Input.c
+    src/widgets/Fl_Secret_Input.c
+    src/widgets/Fl_Output.c
+    src/widgets/Fl_Multiline_Output.c
     src/draw/fl_draw.c
     src/draw/fl_colormap.c
 )
@@ -72,4 +79,7 @@ if(CFLTK_BUILD_EXAMPLES)
 
     add_executable(radio examples/radio/radio.c)
     target_link_libraries(radio PRIVATE cfltk)
+
+    add_executable(input examples/input/input.c)
+    target_link_libraries(input PRIVATE cfltk)
 endif()
