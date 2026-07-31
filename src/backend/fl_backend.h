@@ -1,0 +1,59 @@
+/*
+ * cfltk - fl_backend.h (internal)
+ *
+ * The seam between the platform-independent core (Fl.c, Fl_Window.c) and
+ * a concrete platform backend (src/backend/x11). A backend must provide
+ * every function declared here, and must call fl_backend_set_event_state()
+ * + Fl_context_handle() (from cfltk/Fl.h) as it translates native events.
+ *
+ * This header is not installed; it is not part of cfltk's public API.
+ * A NuttX/NX backend implements the exact same surface in
+ * src/backend/nx/ without touching core/.
+ */
+#ifndef CFLTK_BACKEND_H
+#define CFLTK_BACKEND_H
+
+#include "cfltk/Fl_Window.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* Lazily called the first time any window is shown. Idempotent. Opens
+ * the display, installs the Fl_Graphics_Driver, initializes fonts. */
+int fl_backend_init(void);
+void fl_backend_shutdown(void);
+
+void fl_backend_window_create(Fl_Window *win);
+void fl_backend_window_show(Fl_Window *win);
+void fl_backend_window_hide(Fl_Window *win);
+void fl_backend_window_destroy(Fl_Window *win);
+/* Re-syncs the native window's geometry after Fl_Widget's x/y/w/h have
+ * already been updated. No-op if the window isn't shown yet. */
+void fl_backend_window_reshape(Fl_Window *win);
+
+/* Blits/exposes whatever cfltk drew into the window's damaged area. */
+void fl_backend_window_flush(Fl_Window *win);
+
+/* Processes pending native events, blocking up to timeout_secs if the
+ * queue is empty (a huge value, e.g. 1e20, blocks "forever"). Returns
+ * non-zero if at least one event was translated and dispatched. */
+int fl_backend_wait(double timeout_secs);
+
+/* Non-blocking: true if fl_backend_wait(0) would find something to do. */
+int fl_backend_ready(void);
+
+/* Fills in the core's event-state snapshot; called by the backend right
+ * before Fl_context_handle(). Declared in Fl.c, not here, because it
+ * writes to the core's private Fl_Context -- this prototype is the
+ * cross-file seam for that one function. */
+void fl_backend_set_event_state(int x, int y, int x_root, int y_root,
+                                 int dx, int dy, int button, int clicks,
+                                 int is_click, int state, int key,
+                                 const char *text, int length);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* CFLTK_BACKEND_H */
