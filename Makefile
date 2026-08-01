@@ -46,6 +46,9 @@ CORE_SRCS := \
     src/widgets/Fl_Multiline_Output.c \
     src/widgets/Fl_Tabs.c \
     src/widgets/Fl_Scroll.c \
+    src/widgets/Fl_Pack.c \
+    src/widgets/Fl_Tile.c \
+    src/widgets/Fl_Wizard.c \
     src/widgets/Fl_Browser_.c \
     src/widgets/Fl_Browser.c \
     src/widgets/Fl_Select_Browser.c \
@@ -143,6 +146,7 @@ $(LIB): $(BUILD_DIR) $(OBJS)
 examples: $(LIB)
 	$(CC) $(CFLAGS) examples/hello/hello.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/hello
 	$(CC) $(CFLAGS) examples/double_window/double_window.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/double_window
+	$(CC) $(CFLAGS) examples/layout/layout.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/layout
 	$(CC) $(CFLAGS) examples/buttons/buttons.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/buttons
 	$(CC) $(CFLAGS) examples/radio/radio.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/radio
 	$(CC) $(CFLAGS) examples/input/input.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/input

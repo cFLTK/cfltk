@@ -67,6 +67,9 @@ under an isolated X11 display):
 | `Fl_Adjuster` | `include/cfltk/Fl_Adjuster.h`, `src/valuators/Fl_Adjuster.c` |
 | `Fl_Tabs` | `include/cfltk/Fl_Tabs.h`, `src/widgets/Fl_Tabs.c` |
 | `Fl_Scroll` | `include/cfltk/Fl_Scroll.h`, `src/widgets/Fl_Scroll.c` |
+| `Fl_Pack` | `include/cfltk/Fl_Pack.h`, `src/widgets/Fl_Pack.c` |
+| `Fl_Tile` | `include/cfltk/Fl_Tile.h`, `src/widgets/Fl_Tile.c` |
+| `Fl_Wizard` | `include/cfltk/Fl_Wizard.h`, `src/widgets/Fl_Wizard.c` |
 | `Fl_Browser_` | `include/cfltk/Fl_Browser_.h`, `src/widgets/Fl_Browser_.c` |
 | `Fl_Browser` | `include/cfltk/Fl_Browser.h`, `src/widgets/Fl_Browser.c` |
 | `Fl_Select_Browser` / `Fl_Hold_Browser` / `Fl_Multi_Browser` | `include/cfltk/Fl_{Select,Hold,Multi}_Browser.h`, `src/widgets/Fl_{Select,Hold,Multi}_Browser.c` |
@@ -662,6 +665,25 @@ under an isolated X11 display):
   unavailable on any modern compositing display; upstream's own
   overlay path already silently falls back to normal drawing when the
   server doesn't support it, which is effectively always true today.
+- **`Fl_Tile`'s pre-drag layout snapshot lives as file-static state in
+  `Fl_Tile.c`, not a reuse of `Fl_Group`'s own `sizes` cache.** Fl_Tile's
+  algorithm needs upstream's exact `4*(children+2)`-int layout (a
+  block for the group, a block for the *clipped resizable bounds*,
+  then one block per child) -- `Fl_Group_resize()`'s own simplified
+  `sizes` cache (see `Fl_Group.h`'s known differences) doesn't carry
+  that second block, since `Fl_Group_resize()` computes the resizable's
+  clipped bounds a different way. Recomputed fresh at the start of
+  every drag gesture rather than lazily cached until an explicit
+  invalidation, which sidesteps a real upstream hazard (forget to call
+  `init_sizes()` after changing children post-construction and the
+  cached layout goes stale) at the cost of one array rebuild per
+  drag -- cheap, and only one `Fl_Tile` can be mid-drag at a time
+  anyway (matches upstream's own function-static drag-state variables
+  in `Fl_Tile::handle()`).
+- **No custom mouse cursor shapes while hovering an `Fl_Tile` draggable
+  border, and `Fl_Wizard::value()` no longer resets the cursor to
+  default on pane switch** -- both are the same pre-existing "no
+  cursor-shape API" limitation noted for `Fl_Text_Display`.
 
 ## Next phases (not started)
 

@@ -52,6 +52,9 @@ set(CFLTK_CORE_SOURCES
     src/widgets/Fl_Multiline_Output.c
     src/widgets/Fl_Tabs.c
     src/widgets/Fl_Scroll.c
+    src/widgets/Fl_Pack.c
+    src/widgets/Fl_Tile.c
+    src/widgets/Fl_Wizard.c
     src/widgets/Fl_Browser_.c
     src/widgets/Fl_Browser.c
     src/widgets/Fl_Select_Browser.c
@@ -174,6 +177,9 @@ if(CFLTK_BUILD_EXAMPLES)
 
     add_executable(double_window examples/double_window/double_window.c)
     target_link_libraries(double_window PRIVATE cfltk)
+
+    add_executable(layout examples/layout/layout.c)
+    target_link_libraries(layout PRIVATE cfltk)
 
     add_executable(buttons examples/buttons/buttons.c)
     target_link_libraries(buttons PRIVATE cfltk)
