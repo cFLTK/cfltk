@@ -321,7 +321,9 @@ void Fl_Widget_draw_label_at(const Fl_Widget *self, int x, int y, int w, int h, 
         l1.color = fl_inactive(l1.color);
         if (l1.deimage) l1.image = l1.deimage;
     }
+    if (self->flags & FL_WIDGET_SHORTCUT_LABEL) fl_draw_shortcut = 1;
     fl_label_draw(&l1, x, y, w, h, align);
+    fl_draw_shortcut = 0;
 }
 
 void Fl_Widget_draw_label_in(const Fl_Widget *self, int x, int y, int w, int h) {

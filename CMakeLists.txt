@@ -12,7 +12,11 @@ endif()
 option(CFLTK_BACKEND_X11 "Build the Linux/X11 reference backend" ON)
 option(CFLTK_BUILD_EXAMPLES "Build the example programs" ON)
 
-add_compile_options(-Wall -Wextra -Wno-unused-parameter)
+add_compile_options(-Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers)
+# The last flag isn't a laxness concession: Fl_Menu_Item arrays are meant
+# to be written the same terse, positional way FLTK C++ apps write them
+# (`{"&Open", 0, cb}` relying on the trailing fields defaulting to zero),
+# and -Wextra otherwise flags every single one of them.
 
 # ---------------------------------------------------------------------
 # Core library (platform-independent)
@@ -39,6 +43,12 @@ set(CFLTK_CORE_SOURCES
     src/widgets/Fl_Secret_Input.c
     src/widgets/Fl_Output.c
     src/widgets/Fl_Multiline_Output.c
+    src/menu/Fl_Menu_Item.c
+    src/menu/Fl_Menu_.c
+    src/menu/fl_menu_popup.c
+    src/menu/Fl_Menu_Button.c
+    src/menu/Fl_Choice.c
+    src/menu/Fl_Menu_Bar.c
     src/draw/fl_draw.c
     src/draw/fl_colormap.c
 )
@@ -82,4 +92,7 @@ if(CFLTK_BUILD_EXAMPLES)
 
     add_executable(input examples/input/input.c)
     target_link_libraries(input PRIVATE cfltk)
+
+    add_executable(menus examples/menus/menus.c)
+    target_link_libraries(menus PRIVATE cfltk)
 endif()

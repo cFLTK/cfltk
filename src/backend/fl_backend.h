@@ -43,6 +43,21 @@ int fl_backend_wait(double timeout_secs);
 /* Non-blocking: true if fl_backend_wait(0) would find something to do. */
 int fl_backend_ready(void);
 
+/* Redirects ALL subsequent pointer and keyboard events to `win`
+ * regardless of which physical window is under the cursor (X11:
+ * XGrabPointer/XGrabKeyboard with owner_events=False), until
+ * fl_backend_ungrab(). Used only by the menu popup engine
+ * (src/menu/fl_menu_popup.c) to implement click-outside-to-dismiss and
+ * to keep tracking the pointer past a popup's edges without needing
+ * cfltk's own Fl::grab()/modal() stack (not implemented -- see
+ * docs/DESIGN.md). */
+void fl_backend_grab(Fl_Window *win);
+void fl_backend_ungrab(void);
+
+/* Screen dimensions in pixels, for clamping popup menu geometry on
+ * screen. */
+void fl_backend_screen_size(int *w, int *h);
+
 /* Fills in the core's event-state snapshot; called by the backend right
  * before Fl_context_handle(). Declared in Fl.c, not here, because it
  * writes to the core's private Fl_Context -- this prototype is the

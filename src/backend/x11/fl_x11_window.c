@@ -9,6 +9,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <X11/XKBlib.h>
+
 #include "fl_x11_internal.h"
 #include "../fl_backend.h"
 
@@ -32,6 +34,16 @@ int fl_backend_init(void) {
     fl_x11_colormap = DefaultColormap(fl_x11_display, fl_x11_screen);
     fl_x11_root = RootWindow(fl_x11_display, fl_x11_screen);
     fl_x11_wm_delete_window = XInternAtom(fl_x11_display, "WM_DELETE_WINDOW", False);
+
+    /* Without this, a held key generates alternating KeyRelease/KeyPress
+     * "repeat" pairs at the same coordinates instead of repeated KeyPress
+     * with one real KeyRelease at the end -- indistinguishable from a
+     * genuine rapid press/release storm downstream. Matters most for
+     * code that (like the menu popup engine) grabs the keyboard. */
+    {
+        Bool supported = False;
+        XkbSetDetectableAutoRepeat(fl_x11_display, True, &supported);
+    }
 
     fl_x11_driver_init();
 
@@ -139,4 +151,39 @@ void fl_backend_window_flush(Fl_Window *win) {
     fl_pop_clip();
     fl_x11_current_target = NULL;
     XFlush(fl_x11_display);
+}
+
+void fl_backend_grab(Fl_Window *win) {
+    Fl_X11_Window *xw = fl_x11_window_data(win);
+    int tries;
+    if (!xw) return;
+
+    /* XMapRaised() is asynchronous; grabbing before the server has
+     * actually made the window viewable fails with GrabNotViewable.
+     * Force the map to complete, then retry briefly if needed. */
+    XSync(fl_x11_display, False);
+    for (tries = 0; tries < 20; tries++) {
+        if (XGrabPointer(fl_x11_display, xw->xid, False,
+                          ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
+                          GrabModeAsync, GrabModeAsync, None, None, CurrentTime) == GrabSuccess)
+            break;
+        XSync(fl_x11_display, False);
+    }
+    XGrabKeyboard(fl_x11_display, xw->xid, False, GrabModeAsync, GrabModeAsync, CurrentTime);
+}
+
+void fl_backend_ungrab(void) {
+    if (!fl_x11_display) return;
+    XUngrabPointer(fl_x11_display, CurrentTime);
+    XUngrabKeyboard(fl_x11_display, CurrentTime);
+}
+
+void fl_backend_screen_size(int *w, int *h) {
+    if (fl_x11_display) {
+        *w = DisplayWidth(fl_x11_display, fl_x11_screen);
+        *h = DisplayHeight(fl_x11_display, fl_x11_screen);
+    } else {
+        *w = 1024;
+        *h = 768;
+    }
 }

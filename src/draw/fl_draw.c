@@ -236,17 +236,52 @@ int fl_box_is_frame(uchar boxtype) { return box_entry(boxtype)->is_frame; }
  * work, see docs/DESIGN.md). */
 /* ------------------------------------------------------------------ */
 
+int fl_draw_shortcut = 0;
+
+/* Strips a single '&' mnemonic marker from label text into out (capped
+ * to outcap-1 bytes): "&&" collapses to one literal '&'; a lone '&'
+ * before any other character is removed and that character's byte
+ * offset in `out` is returned via *underline (-1 if no marker, or if
+ * fl_draw_shortcut is unset -- text is then copied through unchanged). */
+static int strip_shortcut_marker(const char *in, char *out, int outcap, int *underline) {
+    int oi = 0;
+    *underline = -1;
+    if (!in) { out[0] = '\0'; return 0; }
+    if (!fl_draw_shortcut) {
+        int n = (int)strlen(in);
+        if (n > outcap - 1) n = outcap - 1;
+        memcpy(out, in, (size_t)n);
+        out[n] = '\0';
+        return n;
+    }
+    while (*in && oi < outcap - 1) {
+        if (*in == '&') {
+            if (in[1] == '&') { out[oi++] = '&'; in += 2; continue; }
+            in++;
+            if (*in && *underline < 0) *underline = oi;
+            continue;
+        }
+        out[oi++] = *in++;
+    }
+    out[oi] = '\0';
+    return oi;
+}
+
 void fl_label_measure(const Fl_Label *label, int *w, int *h) {
+    char buf[512];
+    int underline;
     *w = 0;
     *h = 0;
     if (!label->value || !label->value[0]) return;
     fl_font(label->font, label->size);
-    *w = (int)fl_width_str(label->value);
+    strip_shortcut_marker(label->value, buf, (int)sizeof(buf), &underline);
+    *w = (int)fl_width_str(buf);
     *h = fl_height();
 }
 
 void fl_label_draw(const Fl_Label *label, int x, int y, int w, int h, Fl_Align align) {
-    int lw, lh, lx, ly;
+    int lw, lh, lx, ly, underline, dn, baseline;
+    char buf[512];
 
     if (label->type == FL_NO_LABEL) return;
     if (!label->value || !label->value[0]) return;
@@ -254,7 +289,9 @@ void fl_label_draw(const Fl_Label *label, int x, int y, int w, int h, Fl_Align a
     fl_font(label->font, label->size);
     fl_color(label->color);
 
-    fl_label_measure(label, &lw, &lh);
+    dn = strip_shortcut_marker(label->value, buf, (int)sizeof(buf), &underline);
+    lw = (int)fl_width_str(buf);
+    lh = fl_height();
 
     if (align & FL_ALIGN_LEFT) lx = x;
     else if (align & FL_ALIGN_RIGHT) lx = x + w - lw;
@@ -265,6 +302,13 @@ void fl_label_draw(const Fl_Label *label, int x, int y, int w, int h, Fl_Align a
     else ly = y + (h - lh) / 2;
 
     if (align & FL_ALIGN_CLIP) fl_push_clip(x, y, w, h);
-    fl_draw_text(label->value, (int)strlen(label->value), lx, ly + fl_height() - fl_descent());
+    baseline = ly + fl_height() - fl_descent();
+    fl_draw_text(buf, dn, lx, baseline);
+    if (underline >= 0) {
+        int ux = lx + (int)fl_width(buf, underline);
+        int uw = (int)fl_width(buf + underline, 1);
+        if (uw < 1) uw = 1;
+        fl_line(ux, baseline + 2, ux + uw - 1, baseline + 2);
+    }
     if (align & FL_ALIGN_CLIP) fl_pop_clip();
 }

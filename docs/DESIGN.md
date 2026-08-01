@@ -39,6 +39,12 @@ under an isolated X11 display):
 | `Fl_Secret_Input` | `include/cfltk/Fl_Secret_Input.h`, `src/widgets/Fl_Secret_Input.c` |
 | `Fl_Output` | `include/cfltk/Fl_Output.h`, `src/widgets/Fl_Output.c` |
 | `Fl_Multiline_Output` | `include/cfltk/Fl_Multiline_Output.h`, `src/widgets/Fl_Multiline_Output.c` |
+| `Fl_Menu_Item` | `include/cfltk/Fl_Menu_Item.h`, `src/menu/Fl_Menu_Item.c` |
+| `Fl_Menu_` | `include/cfltk/Fl_Menu_.h`, `src/menu/Fl_Menu_.c` |
+| Menu popup engine (`Fl_Menu_Item::popup()`/`pulldown()`) | `src/menu/fl_menu_popup.c` (own design, see Known differences) |
+| `Fl_Menu_Button` | `include/cfltk/Fl_Menu_Button.h`, `src/menu/Fl_Menu_Button.c` |
+| `Fl_Choice` | `include/cfltk/Fl_Choice.h`, `src/menu/Fl_Choice.c` |
+| `Fl_Menu_Bar` | `include/cfltk/Fl_Menu_Bar.h`, `src/menu/Fl_Menu_Bar.c` |
 | `Fl` (static class) | `include/cfltk/Fl.h`, `src/core/Fl.c` |
 | Timers (`Fl::add_timeout` etc.) | `include/cfltk/Fl.h`, `src/core/Fl.c` (fixed 32-slot pool, no per-timer heap allocation) |
 | Clipboard (`Fl::copy`/`Fl::paste`) | `include/cfltk/Fl.h`, `src/core/Fl.c` (in-process only, see Known differences) |
@@ -154,6 +160,37 @@ under an isolated X11 display):
   lightweight UTF-8 length check, but not elsewhere). `FL_SECRET_INPUT`
   masks with ASCII `*` instead of upstream's Unicode bullet. See
   `Fl_Input.h` for the full list.
+- **The menu popup engine is a from-scratch design, not a translation of
+  `src/Fl_Menu.cxx`.** Upstream opens one native window per visible
+  submenu level and relies on FLTK's own `Fl::grab()`/modal stack to
+  route events across them; cfltk doesn't have that plumbing (see the
+  "No grab()/modal() stack" note above). Instead, `src/menu/fl_menu_popup.c`
+  uses a single borderless popup `Fl_Window` sized to the union of every
+  currently-open level, with a real X11 pointer+keyboard grab
+  (`fl_backend_grab()`, new in `fl_backend.h` alongside
+  `fl_backend_screen_size()`) so every event is delivered to it
+  regardless of which physical window is under the cursor; layout,
+  hit-testing and drawing across levels are done by hand instead of
+  relying on window-manager stacking. Functionally equivalent (validated
+  interactively: menu bar with a 3-level-deep nested submenu, a
+  right-click context menu, `Fl_Choice`, radio groups, inactive items,
+  dividers, and `'&x'` mnemonic underlines all work), but it's a
+  different mechanism a future maintainer should know about before
+  trying to diff it against `Fl_Menu.cxx` line by line. A NuttX/NX
+  backend needs `fl_backend_grab()`/`_ungrab()` implemented (NX has no
+  native concept of a pointer grab, so this will likely become a
+  software redirect inside the backend rather than a single ioctl/call)
+  and `fl_backend_screen_size()`.
+- **`Fl_Menu_::add()`/`insert()` take a flat label, no "File/Open"
+  hierarchical path parsing** (see `Fl_Menu_.h`); build submenu arrays
+  explicitly with `FL_SUBMENU`/`FL_SUBMENU_POINTER` instead, which is
+  what upstream's path parser produces internally anyway. No
+  `item_pathname()`/`find_index(pathname)` either, for the same reason.
+- **`'&x'` mnemonic display** (the underline under a label's shortcut
+  letter) is implemented (`fl_draw_shortcut` in `fl_draw.h`, honored by
+  `fl_label_draw()`), but assumes the marked character is a single ASCII
+  byte -- consistent with the ASCII-only shortcut limitation noted
+  elsewhere (Fl_Widget.h, Fl_Button.h).
 - **No color schemes** (upstream's `Fl::scheme("gtk+"/"plastic"/"gleam")`).
   `Fl_Light_Button`'s indicator always renders via the plain
   `FL_THIN_DOWN_BOX` + `fl_pie()` path; the box-type families those
@@ -182,8 +219,7 @@ under an isolated X11 display):
 
 ## Next phases (not started)
 
-1. More widgets: menus (`Fl_Menu_`, `Fl_Menu_Button`, `Fl_Choice`,
-   `Fl_Menu_Bar`), `Fl_Valuator` family (sliders, dials, counters),
+1. More widgets: `Fl_Valuator` family (sliders, dials, counters),
    `Fl_Browser_`, `Fl_Tabs`, `Fl_Scroll`, `Fl_Text_Buffer`/`Fl_Text_Editor`.
 2. `Fl_Image` + image loaders (behind a compile-time switch).
 3. The rest of the official FLTK example suite (see the contract's

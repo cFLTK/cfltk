@@ -191,6 +191,19 @@ int fl_box_drawing_active(void);
  * protected Fl_Label::draw()/measure() methods. */
 /* ------------------------------------------------------------------ */
 
+/* When set, fl_label_draw()/fl_label_measure() interpret a single '&' in
+ * the label as a mnemonic marker: the marker is removed from the
+ * displayed text and the following character is underlined ("&&"
+ * collapses to one literal '&'). Matches upstream's extern
+ * fl_draw_shortcut; callers set it around one label draw/measure call
+ * and clear it after (see Fl_Widget_draw_label_at() in Fl_Widget.c and
+ * Fl_Menu_Item_draw()/_measure() in Fl_Menu_Item.c for the two places
+ * that manage it). Known difference: the underlined character is
+ * assumed to be a single byte (ASCII), consistent with the ASCII-only
+ * shortcut limitation noted elsewhere (Fl_Widget.h, Fl_Button.h).
+ */
+extern int fl_draw_shortcut;
+
 void fl_label_draw(const Fl_Label *label, int x, int y, int w, int h, Fl_Align align);
 void fl_label_measure(const Fl_Label *label, int *w, int *h);
 
