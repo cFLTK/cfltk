@@ -82,6 +82,7 @@ under an isolated X11 display):
 | `Fl_GIF_Image` | `include/cfltk/Fl_GIF_Image.h`, `src/image/Fl_GIF_Image.c` |
 | `Fl_PNG_Image` (built only when libpng is found, see `CFLTK_ENABLE_PNG`) | `include/cfltk/Fl_PNG_Image.h`, `src/image/Fl_PNG_Image.c` |
 | `Fl_JPEG_Image` (built only when libjpeg is found, see `CFLTK_ENABLE_JPEG`) | `include/cfltk/Fl_JPEG_Image.h`, `src/image/Fl_JPEG_Image.c` |
+| `Fl_Shared_Image` (+ `fl_register_images`/`fl_check_images` from `fl_images_core.cxx`) | `include/cfltk/Fl_Shared_Image.h`, `src/image/Fl_Shared_Image.c` |
 
 ## Cross-cutting translation rules
 
@@ -532,12 +533,43 @@ under an isolated X11 display):
   decode failure** -- cfltk has neither yet. `Fl_Image_fail()` still
   reports the correct `ERR_FILE_ACCESS`/`ERR_FORMAT` code either way,
   so this only affects the diagnostic message, not error handling.
+- **`Fl_Shared_Image`'s `.xbm`/`.xpm` *text-file* auto-detection is not
+  ported** (upstream dispatches these via `Fl_XBM_Image`/
+  `Fl_XPM_Image`, neither of which exists in cfltk -- `Fl_Bitmap`/
+  `Fl_Pixmap` already load from in-memory `char**`/XBM byte data,
+  covering the common compiled-in-icon case). `fl_register_images()`
+  covers BMP/GIF/PNG/JPEG via magic-byte sniffing (ported from
+  upstream's own `fl_images_core.cxx`), minus `Fl_PNM_Image` (PNM/PPM/
+  PGM/PBM -- not ported, no client needs it yet).
+- **`Fl_Shared_Image`'s deferred-resize-on-draw `scale()`/
+  `scaled_image_` (an FLTK 1.3.4-and-later, `FLTK_ABI_VERSION`-gated
+  HiDPI/printing feature) is not ported** -- draw() always delegates
+  straight to the wrapped image at its native size, matching upstream's
+  own pre-1.3.4 fallback behavior (still upstream's *real*, shipped
+  code path, not a cfltk shortcut).
+- **`Fl_PNG_Image`/`Fl_JPEG_Image`'s memory-constructor auto-registration
+  with `Fl_Shared_Image` (the `friend class` relationship in upstream)
+  is not ported** -- consistent with the same note already in
+  `Fl_PNG_Image.h`/`Fl_JPEG_Image.h`. Use
+  `Fl_Shared_Image_get_from_rgb()` to add an already-loaded image to
+  the cache by hand.
+- **Fixed while porting `Fl_Shared_Image`: a real null-pointer crash
+  caught by interactive testing.** `Fl_Shared_Image::reload()` in
+  upstream does `if (alloc_image_) delete image_;` before `image_` has
+  ever been assigned on first load -- safe in C++ only because
+  `delete nullptr` is a guaranteed no-op there. `Fl_Image_delete()` has
+  no such built-in null-safety, so the direct translation of that line
+  segfaulted immediately on the very first `Fl_Shared_Image_get()`
+  call in `examples/shared_image`. Fixed with an explicit
+  `self->wrapped` guard at that one call site (matching the guard
+  upstream's own C++ runtime provides implicitly) rather than making
+  `Fl_Image_delete()` itself null-tolerant, which would silently mask
+  genuine null-pointer bugs at every *other* call site instead of just
+  this one legitimate case.
 
 ## Next phases (not started)
 
-1. `Fl_Shared_Image` (the caching/reference-counted loader-dispatch
-   layer `Fl_File_Browser` needs for automatic file-icon loading).
-2. `Fl_File_Browser`.
+1. `Fl_File_Browser`.
 3. The rest of the official FLTK example suite (see the contract's
    "Required Validation Programs" list), each one both a port target
    and a regression check on the core.

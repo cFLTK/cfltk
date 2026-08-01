@@ -57,6 +57,7 @@ CORE_SRCS := \
     src/image/Fl_Bitmap.c \
     src/image/Fl_BMP_Image.c \
     src/image/Fl_GIF_Image.c \
+    src/image/Fl_Shared_Image.c \
     src/menu/Fl_Menu_Item.c \
     src/menu/Fl_Menu_.c \
     src/menu/fl_menu_popup.c \
@@ -146,6 +147,7 @@ examples: $(LIB)
 	$(CC) $(CFLAGS) examples/text_editor/text_editor.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/text_editor
 	$(CC) $(CFLAGS) examples/images/images.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/images
 	$(CC) $(CFLAGS) $(IMG_CFLAGS) examples/loaders/loaders.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) $(IMG_LIBS) -o $(BUILD_DIR)/loaders
+	$(CC) $(CFLAGS) $(IMG_CFLAGS) examples/shared_image/shared_image.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) $(IMG_LIBS) -o $(BUILD_DIR)/shared_image
 
 clean:
 	rm -f $(OBJS) $(OBJS:.o=.d) $(LIB)

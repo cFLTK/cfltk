@@ -63,6 +63,7 @@ set(CFLTK_CORE_SOURCES
     src/image/Fl_Bitmap.c
     src/image/Fl_BMP_Image.c
     src/image/Fl_GIF_Image.c
+    src/image/Fl_Shared_Image.c
     src/menu/Fl_Menu_Item.c
     src/menu/Fl_Menu_.c
     src/menu/fl_menu_popup.c
@@ -195,4 +196,7 @@ if(CFLTK_BUILD_EXAMPLES)
 
     add_executable(loaders examples/loaders/loaders.c)
     target_link_libraries(loaders PRIVATE cfltk)
+
+    add_executable(shared_image examples/shared_image/shared_image.c)
+    target_link_libraries(shared_image PRIVATE cfltk)
 endif()
