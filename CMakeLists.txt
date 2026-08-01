@@ -67,6 +67,9 @@ set(CFLTK_CORE_SOURCES
     src/valuators/Fl_Counter.c
     src/valuators/Fl_Simple_Counter.c
     src/valuators/Fl_Roller.c
+    src/valuators/Fl_Value_Input.c
+    src/valuators/Fl_Value_Output.c
+    src/valuators/Fl_Adjuster.c
 )
 
 set(CFLTK_SOURCES ${CFLTK_CORE_SOURCES})

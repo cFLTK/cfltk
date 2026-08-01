@@ -23,6 +23,12 @@ void Fl_Valuator_init(Fl_Valuator *self, const Fl_WidgetOps *ops, int x, int y, 
     self->max_ = 1.0;
     self->A = 0.0;
     self->B = 1;
+    self->value_damage = NULL;
+}
+
+static void run_value_damage(Fl_Valuator *self) {
+    if (self->value_damage) self->value_damage(self);
+    else Fl_Widget_set_damage(&self->widget, FL_DAMAGE_EXPOSE);
 }
 
 void Fl_Valuator_set_step(Fl_Valuator *self, double s) {
@@ -51,7 +57,7 @@ int Fl_Valuator_set_value(Fl_Valuator *self, double v) {
     Fl_Widget_clear_changed(&self->widget);
     if (v == self->value_) return 0;
     self->value_ = v;
-    Fl_Widget_set_damage(&self->widget, FL_DAMAGE_EXPOSE);
+    run_value_damage(self);
     return 1;
 }
 
@@ -66,7 +72,7 @@ double Fl_Valuator_softclamp(const Fl_Valuator *self, double v) {
 void Fl_Valuator_handle_drag(Fl_Valuator *self, double v) {
     if (v != self->value_) {
         self->value_ = v;
-        Fl_Widget_set_damage(&self->widget, FL_DAMAGE_EXPOSE);
+        run_value_damage(self);
         Fl_Widget_set_changed(&self->widget);
         if (Fl_Widget_when(&self->widget) & FL_WHEN_CHANGED) Fl_Widget_do_callback(&self->widget);
     }

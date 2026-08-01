@@ -15,6 +15,14 @@
  *                   draw()/handle(), only helpers concrete subclasses
  *                   call from their own. Never instantiated directly.
  * Ownership       : none beyond Fl_Widget's.
+ * Known differences: upstream's protected virtual value_damage() (run
+ *                   whenever value_ changes, overridden by Fl_Value_Input
+ *                   to resync its embedded Fl_Input's text and by
+ *                   Fl_Adjuster to no-op) is a plain optional function
+ *                   pointer field (`value_damage`) here instead, since
+ *                   Fl_Valuator has no vtable of its own to hang a virtual
+ *                   off of. NULL means "do what upstream's default does":
+ *                   mark FL_DAMAGE_EXPOSE.
  */
 #ifndef CFLTK_FL_VALUATOR_H
 #define CFLTK_FL_VALUATOR_H
@@ -35,6 +43,12 @@ typedef struct Fl_Valuator {
     double min_, max_;
     double A;
     int B;
+    /* Optional hook run whenever value_ changes via Fl_Valuator_set_value()/
+     * _handle_drag(), in place of the default "just mark FL_DAMAGE_EXPOSE"
+     * (upstream: the virtual value_damage()). NULL for every valuator
+     * except Fl_Value_Input (needs to resync its embedded Fl_Input's text)
+     * and Fl_Adjuster (appearance doesn't depend on value, so it's a no-op). */
+    void (*value_damage)(struct Fl_Valuator *self);
 } Fl_Valuator;
 
 /* Shared init every concrete valuator's own _init() calls first. */

@@ -7,6 +7,14 @@ CC      ?= cc
 # (`{"&Open", 0, cb}`, trailing fields default to zero); -Wextra
 # otherwise flags every single one of them.
 CFLAGS  ?= -std=c99 -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -g -Iinclude
+# -MMD -MP: emit a .d dependency file per .o listing the headers it
+# included, so editing a shared header (e.g. Fl_Valuator.h) correctly
+# triggers a rebuild of every .c that includes it, not just .c files
+# whose own mtime changed. Without this, `make` silently links stale
+# .o files against a changed struct layout -- an ABI mismatch that
+# manifests as a segfault calling through a garbage function pointer,
+# not a compile error.
+DEPFLAGS := -MMD -MP
 X11_CFLAGS := $(shell pkg-config --cflags x11 xft)
 X11_LIBS   := $(shell pkg-config --libs x11 xft) -lm
 
@@ -54,7 +62,10 @@ CORE_SRCS := \
     src/valuators/Fl_Line_Dial.c \
     src/valuators/Fl_Counter.c \
     src/valuators/Fl_Simple_Counter.c \
-    src/valuators/Fl_Roller.c
+    src/valuators/Fl_Roller.c \
+    src/valuators/Fl_Value_Input.c \
+    src/valuators/Fl_Value_Output.c \
+    src/valuators/Fl_Adjuster.c
 
 X11_SRCS := \
     src/backend/x11/fl_x11_window.c \
@@ -75,10 +86,12 @@ $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
 %.o: %.c
-	$(CC) $(CFLAGS) $(X11_CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(DEPFLAGS) $(X11_CFLAGS) -c $< -o $@
 
 $(LIB): $(BUILD_DIR) $(OBJS)
 	ar rcs $(LIB) $(OBJS)
+
+-include $(OBJS:.o=.d)
 
 examples: $(LIB)
 	$(CC) $(CFLAGS) examples/hello/hello.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/hello
@@ -89,5 +102,5 @@ examples: $(LIB)
 	$(CC) $(CFLAGS) examples/valuators/valuators.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/valuators
 
 clean:
-	rm -f $(OBJS) $(LIB)
+	rm -f $(OBJS) $(OBJS:.o=.d) $(LIB)
 	rm -rf $(BUILD_DIR)

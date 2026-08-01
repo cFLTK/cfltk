@@ -59,6 +59,9 @@ under an isolated X11 display):
 | `Fl_Dial` (+ `Fl_Fill_Dial`/`Fl_Line_Dial`) | `include/cfltk/Fl_Dial.h` and siblings, `src/valuators/Fl_Dial.c` and siblings |
 | `Fl_Counter` (+ `Fl_Simple_Counter`) | `include/cfltk/Fl_Counter.h`, `src/valuators/Fl_Counter.c` and siblings |
 | `Fl_Roller` | `include/cfltk/Fl_Roller.h`, `src/valuators/Fl_Roller.c` |
+| `Fl_Value_Input` | `include/cfltk/Fl_Value_Input.h`, `src/valuators/Fl_Value_Input.c` |
+| `Fl_Value_Output` | `include/cfltk/Fl_Value_Output.h`, `src/valuators/Fl_Value_Output.c` |
+| `Fl_Adjuster` | `include/cfltk/Fl_Adjuster.h`, `src/valuators/Fl_Adjuster.c` |
 
 ## Cross-cutting translation rules
 
@@ -125,6 +128,18 @@ under an isolated X11 display):
   preserves every enumerator's integer value from `FL/Enumerations.H`,
   and `fl_colormap.c` reproduces upstream's 256-entry default palette
   verbatim, so widget code and saved numeric values stay compatible.
+- **The plain Makefile tracks header dependencies (`-MMD -MP`).** Editing
+  a widely-`#include`d header like `Fl_Valuator.h` (e.g. adding a field)
+  must trigger a rebuild of every `.c` that includes it, not just `.c`
+  files whose own mtime changed -- otherwise `make` links stale `.o`s
+  compiled against the old struct layout into the same library as fresh
+  ones compiled against the new layout. That mismatch doesn't fail the
+  build; it segfaults at runtime through a garbage function pointer or
+  corrupted field, which is what happened here (adding `Fl_Valuator`'s
+  `value_damage` field). CMake's generator already tracks this
+  correctly; the plain Makefile didn't until this was found the hard
+  way -- worth remembering if a future header edit causes a build that
+  succeeds but a binary that crashes.
 
 ## Known differences from upstream (tracked for later phases)
 
@@ -240,6 +255,37 @@ under an isolated X11 display):
 - **`Fl_Scrollbar`** has no `"gtk+"` scheme arrow-glyph variant (see the
   "no color schemes" note above) — always draws the plain-scheme
   triangle arrows.
+- **`Fl_Valuator` has an optional `value_damage` function-pointer field**
+  standing in for upstream's protected virtual `value_damage()` (run
+  whenever `value_` changes, so a subclass can resync dependent state --
+  `Fl_Value_Input` uses it to refresh its embedded `Fl_Input`'s text,
+  `Fl_Adjuster` uses it as a no-op since its appearance never depends on
+  the numeric value). `Fl_Valuator` has no vtable of its own to hang a
+  real virtual off of (see its own "none of its own" vtable note above),
+  so this one field is the exception; every other valuator leaves it
+  NULL and gets the default "mark `FL_DAMAGE_EXPOSE`" behavior.
+- **`Fl_Value_Input` embeds a real `Fl_Input` as a plain struct member,
+  not a normal `Fl_Group` child** -- reproducing upstream's own
+  self-described "kludge": `Fl_Value_Input` is an `Fl_Valuator`, not an
+  `Fl_Group`, so the embedded input's `parent` pointer is force-set to
+  `(Fl_Group *)self` after undoing the automatic add `Fl_Input_init()`
+  performs. This is safe in cfltk for the same structural reason
+  `FL_WIDGET()` is safe everywhere else: `Fl_Group` and `Fl_Valuator`
+  both start with `Fl_Widget widget` as their first member, so any code
+  that only ever dereferences `parent->widget` (window()-lookup and
+  visible_r()/active_r() parent-chain walks, redraw bubbling) sees the
+  right bytes regardless of which one the pointer *actually* points to.
+  The one operation that would NOT be safe -- `Fl_Group_add()`/`_remove()`
+  reading/writing real `Fl_Group` fields (the children array) through
+  that fake pointer -- never runs against it: `Fl_Value_Input_destroy()`
+  clears `input.widget.parent` back to NULL before calling
+  `Fl_Input_destroy()`, mirroring upstream's destructor un-kludge
+  exactly. See `Fl_Value_Input.h` for the full writeup.
+- **`Fl_Adjuster`'s three speed buttons** are drawn with 1/2/3 plain
+  triangles via `fl_polygon3()` instead of upstream's three distinct
+  embedded XBM bitmap glyphs (fastarrow/mediumarrow/slowarrow) -- the
+  same kind of image-art substitution already used for `Fl_Counter`'s
+  step buttons, for the same reason (no image support yet).
 - **Upstream's multi-segment `fl_xyline`/`fl_yxline` overloads** (the
   4/5-argument forms that draw a connected two- or three-segment path —
   e.g. vertical-then-horizontal — in one call) have no cfltk equivalent;
@@ -252,8 +298,7 @@ under an isolated X11 display):
 ## Next phases (not started)
 
 1. More widgets: `Fl_Browser_`, `Fl_Tabs`, `Fl_Scroll`,
-   `Fl_Text_Buffer`/`Fl_Text_Editor`, `Fl_Adjuster`, `Fl_Value_Input`/
-   `Fl_Value_Output`.
+   `Fl_Text_Buffer`/`Fl_Text_Editor`.
 2. `Fl_Image` + image loaders (behind a compile-time switch).
 3. The rest of the official FLTK example suite (see the contract's
    "Required Validation Programs" list), each one both a port target

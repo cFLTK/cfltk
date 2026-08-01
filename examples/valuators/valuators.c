@@ -3,9 +3,9 @@
  *
  * Not a direct upstream port -- exercises the Fl_Valuator family:
  * Fl_Slider (vertical + horizontal), Fl_Value_Slider, Fl_Scrollbar,
- * Fl_Dial (normal/line/fill), Fl_Counter/Fl_Simple_Counter, and
- * Fl_Roller, all wired to a status Fl_Output so values are observable
- * without reading pixels.
+ * Fl_Dial (normal/line/fill), Fl_Counter/Fl_Simple_Counter, Fl_Roller,
+ * Fl_Value_Input, Fl_Value_Output, and Fl_Adjuster, all wired to a
+ * status Fl_Output so values are observable without reading pixels.
  */
 #include <stdio.h>
 
@@ -23,6 +23,9 @@
 #include "cfltk/Fl_Counter.h"
 #include "cfltk/Fl_Simple_Counter.h"
 #include "cfltk/Fl_Roller.h"
+#include "cfltk/Fl_Value_Input.h"
+#include "cfltk/Fl_Value_Output.h"
+#include "cfltk/Fl_Adjuster.h"
 
 static Fl_Input *status;
 
@@ -42,7 +45,7 @@ static void scrollbar_cb(Fl_Widget *w, void *data) {
 }
 
 int main(void) {
-    Fl_Window *window = Fl_Window_new(0, 0, 480, 400, "cfltk valuators");
+    Fl_Window *window = Fl_Window_new(0, 0, 480, 470, "cfltk valuators");
 
     Fl_Box *b1 = Fl_Box_new(20, 10, 200, 20, "Vertical / horizontal sliders");
     Fl_Widget_set_align(&b1->widget, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
@@ -105,7 +108,27 @@ int main(void) {
     Fl_Valuator_set_value(roller, 50.0);
     Fl_Widget_set_callback(&roller->widget, slider_cb, (void *)"roller");
 
-    status = Fl_Output_new(20, 340, 440, 25, NULL);
+    Fl_Box *b4 = Fl_Box_new(300, 190, 160, 20, "Value in/out, adjuster");
+    Fl_Widget_set_align(&b4->widget, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+
+    Fl_Value_Input *vin = Fl_Value_Input_new(300, 215, 160, 25, NULL);
+    Fl_Valuator_set_range(&vin->valuator, 0.0, 100.0);
+    Fl_Valuator_set_step(&vin->valuator, 1.0);
+    Fl_Valuator_set_value(&vin->valuator, 42.0);
+    Fl_Widget_set_callback(&vin->valuator.widget, slider_cb, (void *)"value-input");
+
+    Fl_Value_Output *vout = Fl_Value_Output_new(300, 250, 160, 25, NULL);
+    Fl_Valuator_set_range(&vout->valuator, 0.0, 100.0);
+    Fl_Valuator_set_step(&vout->valuator, 1.0);
+    Fl_Valuator_set_value(&vout->valuator, 17.0);
+    Fl_Widget_set_callback(&vout->valuator.widget, slider_cb, (void *)"value-output");
+
+    Fl_Adjuster *adj = Fl_Adjuster_new(300, 285, 160, 25, NULL);
+    Fl_Valuator_set_range(&adj->valuator, 0.0, 100.0);
+    Fl_Valuator_set_value(&adj->valuator, 50.0);
+    Fl_Widget_set_callback(&adj->valuator.widget, slider_cb, (void *)"adjuster");
+
+    status = Fl_Output_new(20, 410, 440, 25, NULL);
     Fl_Input_set_value_str(status, "Drag/click a valuator");
 
     Fl_Group_end(&window->group);
