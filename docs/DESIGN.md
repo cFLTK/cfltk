@@ -78,6 +78,10 @@ under an isolated X11 display):
 | `Fl_Bitmap` | `include/cfltk/Fl_Bitmap.h`, `src/image/Fl_Bitmap.c` |
 | Raw image blit/read-back (`fl_draw_image`/`fl_read_image`/`fl_draw_bitmask`, new `Fl_Graphics_Driver` methods) | `include/cfltk/fl_draw.h`, `src/backend/x11/fl_x11_driver.c` |
 | `fl_parse_color` (new; XPM color-table parsing) | `include/cfltk/fl_colormap.h`, `src/draw/fl_colormap.c` |
+| `Fl_BMP_Image` | `include/cfltk/Fl_BMP_Image.h`, `src/image/Fl_BMP_Image.c` |
+| `Fl_GIF_Image` | `include/cfltk/Fl_GIF_Image.h`, `src/image/Fl_GIF_Image.c` |
+| `Fl_PNG_Image` (built only when libpng is found, see `CFLTK_ENABLE_PNG`) | `include/cfltk/Fl_PNG_Image.h`, `src/image/Fl_PNG_Image.c` |
+| `Fl_JPEG_Image` (built only when libjpeg is found, see `CFLTK_ENABLE_JPEG`) | `include/cfltk/Fl_JPEG_Image.h`, `src/image/Fl_JPEG_Image.c` |
 
 ## Cross-cutting translation rules
 
@@ -489,32 +493,60 @@ under an isolated X11 display):
   side-by-side layout, and `@`-prefixed inline symbol glyphs in labels
   (`fl_draw_symbol()`'s mini-language -- distinct from `Fl_Browser`'s
   own `@`-format codes, which *are* ported).
-- **No PNG/JPEG/GIF/BMP file-format loaders yet.** `Fl_RGB_Image`,
-  `Fl_Pixmap` (XPM, in-memory `char**` data), and `Fl_Bitmap` (XBM,
-  in-memory data) are complete; decoding actual image *files* is
-  follow-up work (`Fl_PNG_Image`/`Fl_JPEG_Image` need `libpng`/`libjpeg`
-  behind a compile-time switch per the original plan; `Fl_BMP_Image`/
-  `Fl_GIF_Image` are self-contained decoders needing no external
-  library). See Next phases.
+- **`Fl_PNG_Image`/`Fl_JPEG_Image` are only compiled at all when their
+  library is found** (`CFLTK_ENABLE_PNG`/`CFLTK_ENABLE_JPEG` in
+  CMakeLists.txt, `CFLTK_ENABLE_PNG`/`CFLTK_ENABLE_JPEG` make variables
+  in the Makefile, both auto-detected via `pkg-config` and defaulting
+  to on when found) -- this is a build-time source-inclusion decision,
+  not an internal `#ifdef HAVE_LIBPNG` the way upstream does it, since
+  a NuttX/embedded target may want the whole library dependency gone,
+  not just stubbed to a no-op. When built, `CFLTK_HAVE_PNG`/
+  `CFLTK_HAVE_JPEG` are defined on the `cfltk` target (and propagate to
+  anything linking it) so client code can `#ifdef` around their use,
+  as `examples/loaders/loaders.c` does.
+- **`Fl_PNG_Image`/`Fl_JPEG_Image`'s in-memory-buffer constructors
+  don't auto-register with `Fl_Shared_Image`** the way upstream's do --
+  `Fl_Shared_Image` doesn't exist in cfltk yet (see Next phases). The
+  decode itself is fully ported.
+- **Fixed while porting `Fl_JPEG_Image`: upstream's in-memory JPEG
+  reader has no real bounds checking.** Upstream hand-rolls its own
+  `jpeg_mem_src()` whose `fill_input_buffer()` always claims exactly
+  4096 more bytes are available regardless of the actual buffer size,
+  silently reading past the end for any input under ~4KB or not
+  block-aligned. This translation uses libjpeg's own standard
+  `jpeg_mem_src(cinfo, buffer, size)` (an explicit-length, bounds-safe
+  API present in libjpeg-turbo and all IJG releases >= 8) instead of
+  reimplementing the unsafe version -- consistent with this project's
+  practice of fixing real bugs found while translating rather than
+  faithfully reproducing them (compare the `Fl_Text_Editor` `compose()`
+  fix and the `Fl_GIF_Image` EOF-check fix below).
+- **Fixed while porting `Fl_GIF_Image`: upstream's `if (i<0)` EOF check
+  is dead code.** `NEXTBYTE` casts `getc()`'s result to `uchar` before
+  it can ever be compared as negative, so `EOF` (-1) silently becomes
+  255 and is never detected there -- on a truncated file, upstream
+  loops reading synthetic 255 bytes rather than reporting
+  `ERR_FORMAT`. This translation checks `feof()` directly instead, a
+  minor robustness fix with no behavior change for any well-formed GIF.
+- **`Fl_BMP_Image`/`Fl_GIF_Image`/`Fl_PNG_Image`/`Fl_JPEG_Image` write
+  to stderr instead of calling `Fl::warning()`/`Fl::error()` on
+  decode failure** -- cfltk has neither yet. `Fl_Image_fail()` still
+  reports the correct `ERR_FILE_ACCESS`/`ERR_FORMAT` code either way,
+  so this only affects the diagnostic message, not error handling.
 
 ## Next phases (not started)
 
-1. `Fl_BMP_Image`/`Fl_GIF_Image` (self-contained decoders, no external
-   library dependency) and `Fl_PNG_Image`/`Fl_JPEG_Image` (need
-   `libpng`/`libjpeg`, behind a compile-time switch) file-format
-   loaders on top of the now-complete `Fl_Image`/`Fl_RGB_Image` base.
-2. `Fl_Shared_Image` (the caching/reference-counted loader-dispatch
+1. `Fl_Shared_Image` (the caching/reference-counted loader-dispatch
    layer `Fl_File_Browser` needs for automatic file-icon loading).
-3. `Fl_File_Browser`.
-4. The rest of the official FLTK example suite (see the contract's
+2. `Fl_File_Browser`.
+3. The rest of the official FLTK example suite (see the contract's
    "Required Validation Programs" list), each one both a port target
    and a regression check on the core.
-5. Automated regression tests (widget lifecycle, event propagation,
+4. Automated regression tests (widget lifecycle, event propagation,
    layout/resize, parent/child bookkeeping) — none exist yet; phase 1
    was validated by visual inspection of `examples/hello` only.
-6. Dillo integration once the widget set Dillo's `dw::fltk` needs is
+5. Dillo integration once the widget set Dillo's `dw::fltk` needs is
    covered.
-7. A NuttX/NX backend implementing the exact `src/backend/fl_backend.h`
+6. A NuttX/NX backend implementing the exact `src/backend/fl_backend.h`
    seam the X11 backend implements now.
 
 ## Reference source
