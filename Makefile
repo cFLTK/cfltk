@@ -76,6 +76,7 @@ CORE_SRCS := \
     src/draw/fl_draw.c \
     src/draw/fl_symbols.c \
     src/draw/fl_colormap.c \
+    src/dialogs/fl_ask.c \
     src/valuators/Fl_Valuator.c \
     src/valuators/Fl_Slider.c \
     src/valuators/Fl_Fill_Slider.c \
@@ -162,6 +163,7 @@ examples: $(LIB)
 	$(CC) $(CFLAGS) $(IMG_CFLAGS) examples/loaders/loaders.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) $(IMG_LIBS) -o $(BUILD_DIR)/loaders
 	$(CC) $(CFLAGS) $(IMG_CFLAGS) examples/shared_image/shared_image.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) $(IMG_LIBS) -o $(BUILD_DIR)/shared_image
 	$(CC) $(CFLAGS) examples/tooltip/tooltip.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/tooltip
+	$(CC) $(CFLAGS) examples/dialogs/dialogs.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/dialogs
 
 clean:
 	rm -f $(OBJS) $(OBJS:.o=.d) $(LIB)

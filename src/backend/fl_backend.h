@@ -58,6 +58,17 @@ void fl_backend_ungrab(void);
  * screen. */
 void fl_backend_screen_size(int *w, int *h);
 
+/* Live pointer position in root/screen coordinates (X11: XQueryPointer
+ * on the root window), independent of the last dispatched event --
+ * needed by Fl_Window_hotspot() to center a not-yet-shown dialog under
+ * the mouse before any event targeting it has been received. */
+void fl_backend_query_pointer(int *x_root, int *y_root);
+
+/* System beep (X11: XBell). `type` is an Fl_Beep value (fl_ask.h),
+ * passed through as a plain int since this header must stay
+ * self-contained/backend-agnostic. */
+void fl_backend_beep(int type);
+
 /* Fills in the core's event-state snapshot; called by the backend right
  * before Fl_context_handle(). Declared in Fl.c, not here, because it
  * writes to the core's private Fl_Context -- this prototype is the

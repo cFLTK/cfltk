@@ -94,6 +94,7 @@ under an isolated X11 display):
 | Directory-listing utilities (new; `fl_filename_list`/`fl_numericsort`/`fl_filename_match`/`fl_filename_isdir`, collected from several small upstream files) | `include/cfltk/fl_filename.h`, `src/core/fl_filename.c` |
 | `Fl_File_Browser` (no `Fl_File_Icon`, see Known differences) | `include/cfltk/Fl_File_Browser.h`, `src/widgets/Fl_File_Browser.c` |
 | `Fl_Tooltip` | `include/cfltk/Fl_Tooltip.h`, `src/core/Fl_Tooltip.c` |
+| `fl_ask.H` common dialogs (`fl_message`/`fl_alert`/`fl_ask`/`fl_choice`/`fl_choice_n`/`fl_input`/`fl_password`) | `include/cfltk/fl_ask.h`, `src/dialogs/fl_ask.c` |
 
 ## Cross-cutting translation rules
 
@@ -320,6 +321,59 @@ under an isolated X11 display):
   `Fl_scrollbar_size()` already do this in `Fl.h`. The popup window
   reuses the same border-0/override-redirect trick as the menu popup
   engine (`fl_menu_popup.c`) instead of a real `Fl_Menu_Window`.
+- **Bug fix: moving a window with a `resizable_widget` also shifted its
+  children.** `Fl_Group_resize()` (`Fl_Group.c`) was missing upstream's
+  `type() >= FL_WINDOW` guard (`src/Fl_Group.cxx`): a widget's children
+  store window-local coordinates that must NOT change just because the
+  enclosing top-level window is repositioned on screen (only the
+  window's own `x()`/`y()`, used to place the native X window, should
+  move) -- but cfltk's port unconditionally shifted every child by the
+  window's move delta in both the plain-translate and the proportional-
+  cascade branches. Harmless for a window with no `resizable_widget`
+  (the common case), but any window that both sets one *and* gets
+  moved after layout -- e.g. `fl_ask.c`'s dialog, positioned by
+  `Fl_Window_hotspot()` right after `resizeform()` lays out 1-3 buttons
+  -- had every child silently offset by the window's own hotspot delta,
+  pushing buttons below the visible drawable (invisible, not just
+  misdrawn). Fixed by zeroing the translation applied to children when
+  `Fl_Widget_as_window(self_w)` is non-NULL, matching upstream's
+  `dx = dy = 0` exactly. Found and reproduced while implementing
+  `fl_ask.c`'s `fl_choice()` (3 visible buttons; `fl_message()`'s single
+  button happened not to trigger the proportional-cascade branch the
+  same way, which is why this stayed latent until now).
+- **`Fl_Group_resize()` also gained upstream's `dw==0 && dh==0`
+  shortcut** (a pure move, no size change): previously ANY resize call
+  with a `resizable_widget` set took the full proportional-cascade-
+  from-cached-`sizes_` path even for a pure translation, discarding any
+  layout applied to children after the group's last real (size-
+  changing) resize and replacing it with a stale recompute. Found
+  alongside the bug above, in the same `Fl_Window_hotspot()` call path.
+- **`fl_ask.h` common dialogs** (`fl_message`/`fl_alert`/`fl_ask`/
+  `fl_choice`/`fl_choice_n`/`fl_input`/`fl_password`): a single reused
+  dialog window (`makeform()`/`innards()`/`resizeform()`, translated
+  near-verbatim from `src/fl_ask.cxx`), positioned via the new
+  `Fl_Window_hotspot()`/`Fl_Window_hotspot_widget()` (`Fl_Window.c`,
+  ported from `src/Fl_Window_hotspot.cxx`; the widget-overload skips
+  upstream's `o->window()` accumulation loop across nested window
+  boundaries, not a supported/tested configuration here) and a new
+  `fl_backend_query_pointer()`/`Fl_get_mouse()` (live `XQueryPointer`,
+  independent of the last dispatched event) plus `Fl_screen_xywh()`/
+  `Fl_screen_work_area()` (single-monitor-at-origin, matching the
+  existing convention in `fl_menu_popup.c`). No `Fl::grab()` save/
+  restore around showing the dialog (cfltk has no tracked "current
+  grab" at the `Fl::` level) and the dialog is not truly modal (no
+  `Fl::modal()` event-redirection stack) -- other windows stay
+  independently clickable while a dialog is open, but the call still
+  blocks the caller until the dialog closes, which is what real callers
+  depend on. `size_range()` isn't called (not implemented for
+  `Fl_Window`, and moot without an interactive WM-driven resize path).
+  `fl_message_hotspot()` is split into a setter and
+  `fl_message_hotspot_get()` since C has no overloading. `fl_measure()`
+  (declared in `fl_draw.h` since the vertex/matrix work but never
+  implemented until now) backs `resizeform()`'s layout math: `'\n'`-
+  split line metrics plus the same leading/trailing `@symbol` detection
+  as `fl_label_draw()`, no mnemonic/`'&'` handling (not needed for raw
+  text metrics).
 - **`Fl_Dial`'s dot/line indicator** is drawn as a plain trig-computed
   dot/needle from the hub instead of upstream's small rotated polygon
   shapes. This predates `fl_draw.h`'s push/translate/scale/rotate

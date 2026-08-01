@@ -224,6 +224,14 @@ static int g_scrollbar_size = 16;
 int Fl_scrollbar_size(void) { return g_scrollbar_size; }
 void Fl_set_scrollbar_size(int w) { g_scrollbar_size = w; }
 
+void Fl_get_mouse(int *x_root, int *y_root) { fl_backend_query_pointer(x_root, y_root); }
+
+void Fl_screen_xywh(int *x, int *y, int *w, int *h) {
+    *x = 0;
+    *y = 0;
+    fl_backend_screen_size(w, h);
+}
+
 /* -------------------------------------------------------------------
  * Clipboard (in-process only, see Fl.h)
  * ---------------------------------------------------------------- */

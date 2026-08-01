@@ -499,6 +499,49 @@ static void extract_symbols(char *buf, char **text_out, char *sym0, size_t sym0c
     *text_out = p;
 }
 
+/* Raw text metrics in the current font (caller must fl_font() first,
+ * matching upstream) -- no mnemonic/'&' handling (that's specific to
+ * widget label drawing, see fl_label_draw()/fl_label_measure()), just
+ * '\n'-separated line splitting plus the same leading/trailing
+ * '@symbol' detection as fl_label_draw() when draw_symbols is set.
+ * Used directly by common-dialog layout code (src/dialogs/fl_ask.c). */
+void fl_measure(const char *str, int *w, int *h, int draw_symbols) {
+    int nlines = 0, maxw = 0, symw0 = 0, symw1 = 0, lh;
+    const char *p, *nl, *body;
+    char sym0[64] = "", sym1[64] = "";
+    char buf[1024];
+    int dummy_underline = -1;
+
+    if (!str || !*str) { *w = 0; *h = 0; return; }
+
+    lh = fl_height();
+    body = str;
+
+    if (draw_symbols) {
+        char *text_ptr;
+        size_t n = strlen(str);
+        if (n > sizeof(buf) - 1) n = sizeof(buf) - 1;
+        memcpy(buf, str, n);
+        buf[n] = '\0';
+        extract_symbols(buf, &text_ptr, sym0, sizeof(sym0), sym1, sizeof(sym1), &dummy_underline);
+        if (sym0[0]) symw0 = lh;
+        if (sym1[0]) symw1 = lh;
+        body = text_ptr;
+    }
+
+    for (p = body; p; ) {
+        int len;
+        nl = strchr(p, '\n');
+        len = nl ? (int)(nl - p) : (int)strlen(p);
+        { int lw = (int)fl_width(p, len); if (lw > maxw) maxw = lw; }
+        nlines++;
+        p = nl ? nl + 1 : NULL;
+    }
+
+    *w = maxw + symw0 + symw1;
+    *h = nlines * lh;
+}
+
 void fl_label_measure(const Fl_Label *label, int *w, int *h) {
     char buf[512], sym0[64], sym1[64], *text;
     int underline = -1;

@@ -50,6 +50,18 @@ struct Fl_Window {
 
 extern const Fl_WidgetOps fl_window_ops;
 
+/* The as_group()/as_window() vtable slots shared by fl_window_ops --
+ * exported so any other Fl_Window-based popup with its own custom
+ * Fl_WidgetOps (e.g. fl_menu_popup.c, Fl_Tooltip.c, fl_ask.c) can wire
+ * them in too. Skipping this makes Fl_Widget_window() wrongly return
+ * NULL for every widget inside that popup instead of the popup itself,
+ * since Fl_Widget_window() walks up via Fl_Widget_as_window() checks
+ * (see Fl_Widget_window() in Fl_Widget.c) -- found while chasing a
+ * layout bug in fl_ask.c's dialog (see Fl_Group_resize()'s dw==0/dh==0
+ * fix in Fl_Group.c, a related but distinct bug in the same area). */
+Fl_Group *Fl_Window_as_group(Fl_Widget *self);
+Fl_Window *Fl_Window_as_window(Fl_Widget *self);
+
 /* Constructs a top-level window. Equivalent to Fl_Window(x,y,w,h,label)
  * upstream (position variant) -- the (w,h,label) constructor upstream
  * lets the window manager place the window; pass x=y=0 here and call
@@ -82,6 +94,17 @@ static inline void Fl_Window_clear_border(Fl_Window *self) {
 /* Marks the window (and, transitively, everything inside it) as needing
  * a redraw and a fresh backend blit on the next flush. */
 void Fl_Window_flush(Fl_Window *self);
+
+/* Positions the window so that its own point (X,Y) lands at the
+ * current (live-queried) mouse position, clamped to stay fully
+ * on-screen unless offscreen is set. Mirrors upstream's
+ * Fl_Window::hotspot(int,int,int) (src/Fl_Window_hotspot.cxx). */
+void Fl_Window_hotspot(Fl_Window *self, int X, int Y, int offscreen);
+/* Same, but (X,Y) is the center of widget `w` (which must be this
+ * window or one of its descendants), converted to this window's local
+ * coordinate space by walking w's window() chain. Mirrors upstream's
+ * Fl_Window::hotspot(const Fl_Widget*,int). */
+void Fl_Window_hotspot_widget(Fl_Window *self, const Fl_Widget *w, int offscreen);
 
 #ifdef __cplusplus
 }

@@ -77,6 +77,17 @@ void Fl_set_visible_focus(int v);
 int Fl_scrollbar_size(void);
 void Fl_set_scrollbar_size(int w);
 
+/* Mirrors Fl::get_mouse(int&,int&): the live pointer position in root
+ * (screen) coordinates, queried directly rather than read from the
+ * last dispatched event -- see fl_backend_query_pointer(). */
+void Fl_get_mouse(int *x_root, int *y_root);
+
+/* Mirrors Fl::screen_xywh()/Fl::screen_work_area() for the single-
+ * monitor case: cfltk assumes one screen at origin (0,0), matching the
+ * existing convention in fl_menu_popup.c's clamp_to_screen(). */
+void Fl_screen_xywh(int *x, int *y, int *w, int *h);
+static inline void Fl_screen_work_area(int *x, int *y, int *w, int *h) { Fl_screen_xywh(x, y, w, h); }
+
 /* -------------------------------------------------------------------
  * Clipboard -- mirrors Fl::copy()/Fl::paste(), restricted to an
  * in-process buffer (clipboard 0 = mouse/PRIMARY-style selection,

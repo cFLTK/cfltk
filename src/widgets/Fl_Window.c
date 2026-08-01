@@ -12,8 +12,8 @@
 #include "cfltk/fl_draw.h"
 #include "../backend/fl_backend.h"
 
-static Fl_Group *Fl_Window_as_group(Fl_Widget *self) { return (Fl_Group *)self; }
-static Fl_Window *Fl_Window_as_window(Fl_Widget *self) { return (Fl_Window *)self; }
+Fl_Group *Fl_Window_as_group(Fl_Widget *self) { return (Fl_Group *)self; }
+Fl_Window *Fl_Window_as_window(Fl_Widget *self) { return (Fl_Window *)self; }
 
 /* Upstream: "Fl_Window has a default callback that calls Fl_Window::hide()." */
 static void Fl_Window_default_callback(Fl_Widget *w, void *data) {
@@ -120,4 +120,44 @@ void Fl_Window_set_border(Fl_Window *self, int b) {
 
 void Fl_Window_flush(Fl_Window *self) {
     Fl_Widget_redraw(FL_WIDGET(self));
+}
+
+void Fl_Window_hotspot(Fl_Window *self, int X, int Y, int offscreen) {
+    Fl_Widget *self_w = FL_WIDGET(self);
+    int mx, my;
+
+    Fl_get_mouse(&mx, &my);
+    X = mx - X;
+    Y = my - Y;
+
+    if (!offscreen) {
+        int scr_x, scr_y, scr_w, scr_h;
+        /* Generic on-screen-border allowance for a decorated window;
+         * same fixed KDE-ish defaults upstream's non-WIN32/non-APPLE
+         * branch uses, since cfltk has no way to query the actual
+         * window manager's frame size. */
+        int top = 0, left = 0, right = 0, bottom = 0;
+
+        Fl_screen_work_area(&scr_x, &scr_y, &scr_w, &scr_h);
+        if (Fl_Window_border(self)) { top = 20; left = 4; right = 4; bottom = 8; }
+
+        if (X + self_w->w + right > scr_w + scr_x) X = scr_w + scr_x - right - self_w->w;
+        if (X - left < scr_x) X = left + scr_x;
+        if (Y + self_w->h + bottom > scr_h + scr_y) Y = scr_h + scr_y - bottom - self_w->h;
+        if (Y - top < scr_y) Y = top + scr_y;
+    }
+
+    Fl_Widget_position(self_w, X, Y);
+}
+
+void Fl_Window_hotspot_widget(Fl_Window *self, const Fl_Widget *w, int offscreen) {
+    /* w's x()/y() are already relative to its enclosing top-level
+     * window (cfltk keeps every widget's coordinates in that single
+     * flat space, cascading updates through Fl_Group_resize() rather
+     * than upstream's per-level relative offsets -- see
+     * Fl_Group_draw_children()'s "window vs. non-window" split in
+     * Fl_Group.c). Skips upstream's o->window() accumulation loop,
+     * which exists to walk across *nested* window boundaries -- not a
+     * supported/tested configuration here. */
+    Fl_Window_hotspot(self, w->x + w->w / 2, w->y + w->h / 2, offscreen);
 }

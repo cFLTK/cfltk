@@ -82,6 +82,7 @@ set(CFLTK_CORE_SOURCES
     src/draw/fl_draw.c
     src/draw/fl_symbols.c
     src/draw/fl_colormap.c
+    src/dialogs/fl_ask.c
     src/valuators/Fl_Valuator.c
     src/valuators/Fl_Slider.c
     src/valuators/Fl_Fill_Slider.c
@@ -221,4 +222,7 @@ if(CFLTK_BUILD_EXAMPLES)
 
     add_executable(tooltip examples/tooltip/tooltip.c)
     target_link_libraries(tooltip PRIVATE cfltk)
+
+    add_executable(dialogs examples/dialogs/dialogs.c)
+    target_link_libraries(dialogs PRIVATE cfltk)
 endif()

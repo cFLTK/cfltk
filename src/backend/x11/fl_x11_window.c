@@ -236,3 +236,22 @@ void fl_backend_screen_size(int *w, int *h) {
         *h = 768;
     }
 }
+
+void fl_backend_query_pointer(int *x_root, int *y_root) {
+    Window root_ret, child_ret;
+    int win_x, win_y;
+    unsigned int mask;
+    if (fl_x11_display && XQueryPointer(fl_x11_display, fl_x11_root, &root_ret, &child_ret,
+                                         x_root, y_root, &win_x, &win_y, &mask)) {
+        return;
+    }
+    *x_root = 0;
+    *y_root = 0;
+}
+
+void fl_backend_beep(int type) {
+    if (!fl_backend_init()) return;
+    /* FL_BEEP_DEFAULT(0)/FL_BEEP_ERROR(2): louder; everything else:
+     * quieter -- matches upstream's XBell(fl_display,100)/(...,50) split. */
+    XBell(fl_x11_display, (type == 0 || type == 2) ? 100 : 50);
+}

@@ -192,15 +192,27 @@ void Fl_Group_resize(Fl_Widget *self_w, int X, int Y, int W, int H) {
     int dx, dy, dw, dh;
     int *p;
     int i;
+    /* A top-level (or, if ever supported, native subwindow) widget's
+     * children already store window-local coordinates that don't
+     * change when the WINDOW itself is repositioned on screen -- only
+     * self_w's own x()/y() (used to place the native X window) should
+     * move. Matches upstream's "if (type() >= FL_WINDOW) dx = dy = 0"
+     * in both branches below (src/Fl_Group.cxx Fl_Group::resize()).
+     * Missing this made Fl_Window_hotspot()/position() on any window
+     * with a resizable_widget shift every child by the window's own
+     * move delta on top of their already-correct position -- found
+     * while implementing fl_ask.c's dialog, whose hotspot()-positioned
+     * window has 1-3 buttons plus a resizable_widget. */
+    int is_window = Fl_Widget_as_window(self_w) != NULL;
 
     dx = X - self_w->x;
     dy = Y - self_w->y;
     dw = W - self_w->w;
     dh = H - self_w->h;
 
-    if (!self->children_count || !self->resizable_widget) {
+    if (!self->children_count || !self->resizable_widget || (dw == 0 && dh == 0)) {
         Fl_Widget_default_resize(self_w, X, Y, W, H);
-        if (self->children_count) {
+        if (self->children_count && !is_window) {
             for (i = 0; i < self->children_count; i++)
                 Fl_Widget_position(self->children_array[i],
                                     self->children_array[i]->x + dx,
@@ -213,6 +225,8 @@ void Fl_Group_resize(Fl_Widget *self_w, int X, int Y, int W, int H) {
     p = self->sizes;
 
     Fl_Widget_default_resize(self_w, X, Y, W, H);
+
+    if (is_window) { dx = 0; dy = 0; }
 
     {
         /* Defaults to the group's own original bounds; overridden below

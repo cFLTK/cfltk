@@ -120,8 +120,8 @@ static const Fl_WidgetOps tooltip_ops = {
     Fl_Window_show,
     Fl_Window_hide,
     Fl_Window_destroy,
-    NULL,
-    NULL
+    Fl_Window_as_group,
+    Fl_Window_as_window
 };
 
 static void ensure_window(void) {

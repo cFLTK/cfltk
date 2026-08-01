@@ -421,8 +421,8 @@ static const Fl_WidgetOps popup_ops = {
     Fl_Window_show,
     Fl_Window_hide,
     Fl_Window_destroy,
-    NULL,
-    NULL
+    Fl_Window_as_group,
+    Fl_Window_as_window
 };
 
 /* -------------------------------------------------------------------
