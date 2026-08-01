@@ -96,7 +96,7 @@ under an isolated X11 display):
 | `Fl_Shared_Image` (+ `fl_register_images`/`fl_check_images` from `fl_images_core.cxx`) | `include/cfltk/Fl_Shared_Image.h`, `src/image/Fl_Shared_Image.c` |
 | `Fl_XPM_Image` (loads a `.xpm` file, reusing `Fl_Pixmap`) | `include/cfltk/Fl_XPM_Image.h`, `src/image/Fl_XPM_Image.c` |
 | `Fl_XBM_Image` (loads a `.xbm` file, reusing `Fl_Bitmap`) | `include/cfltk/Fl_XBM_Image.h`, `src/image/Fl_XBM_Image.c` |
-| Directory-listing utilities (new; `fl_filename_list`/`fl_numericsort`/`fl_filename_match`/`fl_filename_isdir`, collected from several small upstream files) | `include/cfltk/fl_filename.h`, `src/core/fl_filename.c` |
+| `filename.H` utilities (`fl_filename_list`/`fl_numericsort`/`fl_filename_match`/`fl_filename_isdir`/`fl_filename_name`/`fl_filename_ext`/`fl_filename_setext`/`fl_filename_expand`/`fl_filename_absolute`/`fl_filename_relative`, collected from several small upstream files) | `include/cfltk/fl_filename.h`, `src/core/fl_filename.c` |
 | `Fl_File_Browser` (no `Fl_File_Icon`, see Known differences) | `include/cfltk/Fl_File_Browser.h`, `src/widgets/Fl_File_Browser.c` |
 | `Fl_Tooltip` | `include/cfltk/Fl_Tooltip.h`, `src/core/Fl_Tooltip.c` |
 | `fl_ask.H` common dialogs (`fl_message`/`fl_alert`/`fl_ask`/`fl_choice`/`fl_choice_n`/`fl_input`/`fl_password`) | `include/cfltk/fl_ask.h`, `src/dialogs/fl_ask.c` |

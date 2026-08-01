@@ -1,14 +1,14 @@
 /*
  * cfltk - fl_filename.h
  *
- * New infrastructure (not a 1:1 header translation): the small set of
- * upstream FL/filename.H directory-listing/pattern-matching utilities
- * Fl_File_Browser needs (fl_filename_list/fl_numericsort/etc., spread
- * across several small upstream .cxx files -- filename_list.cxx,
- * numericsort.c, filename_match.cxx, filename_isdir.cxx -- collected
- * here as one small module since none of them are large enough or
- * independently useful enough to warrant their own header/class-style
- * file each).
+ * New infrastructure (not a 1:1 header translation): the upstream
+ * FL/filename.H utilities, spread across several small upstream files
+ * (filename_list.cxx, numericsort.c, filename_match.cxx,
+ * filename_isdir.cxx, filename_ext.cxx, filename_setext.cxx,
+ * filename_expand.cxx, filename_absolute.cxx, plus fl_filename_name()
+ * from Fl_x.cxx) -- collected here as one small module since none of
+ * them are large enough or independently useful enough to warrant
+ * their own header/class-style file each.
  *
  * Known differences:
  *   - No locale-to-UTF-8 filename re-encoding (upstream's
@@ -24,6 +24,13 @@
  *     `/etc/mtab`-or-`/etc/fstab` fallback chain is ported, since that
  *     is the only branch upstream itself takes on this project's
  *     target platforms.
+ *   - fl_filename_expand()/_absolute()/_relative() are POSIX-only: all
+ *     of upstream's WIN32/__EMX__/__APPLE__-specific branches (`\`
+ *     path separators, drive letters, case-insensitive comparison) are
+ *     dropped, matching this project's Linux/X11-only scope elsewhere.
+ *   - No fl_open_uri()/fl_decode_uri() (shells out to a platform URI
+ *     handler, e.g. xdg-open) -- out of scope for this pass; revisit
+ *     if/when Dillo needs "open externally" support.
  */
 #ifndef CFLTK_FL_FILENAME_H
 #define CFLTK_FL_FILENAME_H
@@ -61,6 +68,40 @@ int fl_casenumericsort(struct dirent **a, struct dirent **b);
  * is not a bug, upstream's fl_filename_match() really does
  * tolower() every character comparison). */
 int fl_filename_match(const char *s, const char *p);
+
+/* Pointer to the char after the last '/' in filename, or filename
+ * itself if there is none; NULL if filename is NULL. Note this can
+ * point at a trailing '\0' (e.g. fl_filename_name("/usr/") == ""). */
+const char *fl_filename_name(const char *filename);
+
+/* Pointer to the last '.' in buf (including the leading '.'), or to
+ * buf's trailing '\0' if there is no extension (matches upstream's
+ * actual behavior, not its docstring, which incorrectly claims NULL). */
+const char *fl_filename_ext(const char *buf);
+
+/* Replaces to's extension (as fl_filename_ext() would find it) with
+ * ext, or appends ext if to has none. ext may be NULL (treated as
+ * ""). Returns `to`. */
+char *fl_filename_setext(char *to, int tolen, const char *ext);
+
+/* Expands leading "~"/"~user"/"$VARNAME" components of `from` into
+ * `to` (tolen bytes). Returns non-zero if any substitution was made.
+ * to and from may be the same buffer. */
+int fl_filename_expand(char *to, int tolen, const char *from);
+
+/* Makes `from` absolute (prepends the current working directory,
+ * collapsing "." and ".." components) into `to` (tolen bytes).
+ * Returns non-zero if any change was made (0 if `from` was already
+ * absolute, in which case it's copied through unchanged). */
+int fl_filename_absolute(char *to, int tolen, const char *from);
+
+/* Makes absolute path `from` relative to absolute path `base` (both
+ * assumed to already be absolute -- neither is expanded/resolved
+ * further), writing the result into `to` (tolen bytes). Returns
+ * non-zero if any change was made. */
+int fl_filename_relative_to(char *to, int tolen, const char *from, const char *base);
+/* Same, using the current working directory as the base. */
+int fl_filename_relative(char *to, int tolen, const char *from);
 
 #ifdef __cplusplus
 }

@@ -2,20 +2,27 @@
  * cfltk - fl_filename.c
  * See include/cfltk/fl_filename.h for scope notes.
  * Translated from src/filename_list.cxx, src/numericsort.c,
- * src/filename_match.cxx, src/filename_isdir.cxx.
+ * src/filename_match.cxx, src/filename_isdir.cxx, src/filename_ext.cxx,
+ * src/filename_setext.cxx, src/filename_expand.cxx,
+ * src/filename_absolute.cxx, and fl_filename_name() from src/Fl_x.cxx.
  */
 #ifndef _DEFAULT_SOURCE
 #define _DEFAULT_SOURCE /* scandir()/S_IFDIR under strict -std=c99 */
 #endif
 
 #include <ctype.h>
+#include <pwd.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#include <unistd.h>
 
 #include "cfltk/fl_filename.h"
+
+#define isdirsep(c) ((c) == '/')
 
 int fl_filename_isdir(const char *n) {
     struct stat s;
@@ -203,4 +210,206 @@ void fl_filename_free_list(struct dirent ***list, int n) {
     for (i = 0; i < n; i++) free((*list)[i]);
     free(*list);
     *list = NULL;
+}
+
+/* -------------------------------------------------------------------
+ * Path component/extension helpers
+ * ---------------------------------------------------------------- */
+
+const char *fl_filename_name(const char *name) {
+    const char *p, *q;
+    if (!name) return NULL;
+    for (p = q = name; *p; ) {
+        if (*p++ == '/') q = p;
+    }
+    return q;
+}
+
+const char *fl_filename_ext(const char *buf) {
+    const char *q = NULL;
+    const char *p;
+    for (p = buf; *p; p++) {
+        if (*p == '/') q = NULL;
+        else if (*p == '.') q = p;
+    }
+    return q ? q : p;
+}
+
+char *fl_filename_setext(char *to, int tolen, const char *ext) {
+    char *q = (char *)fl_filename_ext(to);
+    int qoff = (int)(q - to);
+    if (ext) snprintf(q, (size_t)(tolen - qoff), "%s", ext);
+    else *q = '\0';
+    return to;
+}
+
+/* -------------------------------------------------------------------
+ * Expansion / absolute / relative
+ * ---------------------------------------------------------------- */
+
+int fl_filename_expand(char *to, int tolen, const char *from) {
+    char *temp = (char *)malloc((size_t)tolen);
+    char *start = temp;
+    char *end;
+    char *a;
+    int ret = 0;
+
+    snprintf(temp, (size_t)tolen, "%s", from);
+    end = temp + strlen(temp);
+
+    for (a = temp; a < end; ) {
+        char *e;
+        const char *value = NULL;
+        char t;
+        int len;
+
+        for (e = a; e < end && !isdirsep(*e); e++) { /* find next slash */ }
+
+        if (*a == '~') {
+            if (e <= a + 1) {
+                value = getenv("HOME");
+            } else {
+                struct passwd *pwd;
+                t = *e; *e = '\0';
+                pwd = getpwnam(a + 1);
+                *e = t;
+                if (pwd) value = pwd->pw_dir;
+            }
+        } else if (*a == '$') {
+            t = *e; *e = '\0';
+            value = getenv(a + 1);
+            *e = t;
+        }
+
+        if (value) {
+            if (isdirsep(value[0])) start = a;
+            len = (int)strlen(value);
+            if (len > 0 && isdirsep(value[len - 1])) len--;
+            if ((end + 1 - e + len) >= tolen) end += tolen - (end + 1 - e + len);
+            memmove(a + len, e, (size_t)(end + 1 - e));
+            end = a + len + (end - e);
+            *end = '\0';
+            memcpy(a, value, (size_t)len);
+            ret++;
+        } else {
+            a = e + 1;
+        }
+    }
+
+    snprintf(to, (size_t)tolen, "%s", start);
+    free(temp);
+    return ret;
+}
+
+int fl_filename_absolute(char *to, int tolen, const char *from) {
+    char *temp, *a;
+    const char *start = from;
+
+    if (isdirsep(*from) || *from == '|') {
+        snprintf(to, (size_t)tolen, "%s", from);
+        return 0;
+    }
+
+    temp = (char *)malloc((size_t)tolen);
+    if (!getcwd(temp, (size_t)tolen)) {
+        snprintf(to, (size_t)tolen, "%s", from);
+        free(temp);
+        return 0;
+    }
+    a = temp + strlen(temp);
+    if (a > temp && isdirsep(*(a - 1))) a--;
+
+    /* collapse leading "." / ".." components of `start` against `a` */
+    while (*start == '.') {
+        if (start[1] == '.' && isdirsep(start[2])) {
+            char *b;
+            for (b = a - 1; b >= temp && !isdirsep(*b); b--) { /* empty */ }
+            if (b < temp) break;
+            a = b;
+            start += 3;
+        } else if (isdirsep(start[1])) {
+            start += 2;
+        } else if (!start[1]) {
+            start++;
+            break;
+        } else {
+            break;
+        }
+    }
+
+    *a++ = '/';
+    snprintf(a, (size_t)(tolen - (a - temp)), "%s", start);
+    snprintf(to, (size_t)tolen, "%s", temp);
+    free(temp);
+    return 1;
+}
+
+int fl_filename_relative_to(char *to, int tolen, const char *from, const char *base) {
+    const char *slash;
+    char *newslash;
+    char *cwd_buf = NULL;
+    char *cwd = NULL;
+
+    if (base) cwd = cwd_buf = strdup(base);
+
+    if (from[0] == '\0' || !isdirsep(*from)) {
+        snprintf(to, (size_t)tolen, "%s", from);
+        free(cwd_buf);
+        return 0;
+    }
+    if (!cwd || cwd[0] == '\0' || !isdirsep(*cwd)) {
+        snprintf(to, (size_t)tolen, "%s", from);
+        free(cwd_buf);
+        return 0;
+    }
+
+    if (!strcmp(from, cwd)) {
+        snprintf(to, (size_t)tolen, ".");
+        free(cwd_buf);
+        return 1;
+    }
+
+    for (slash = from, newslash = cwd; *slash != '\0' && *newslash != '\0'; slash++, newslash++) {
+        if (isdirsep(*slash) && isdirsep(*newslash)) continue;
+        if (*slash != *newslash) break;
+    }
+
+    if (*newslash == '\0' && *slash != '\0' && !isdirsep(*slash) &&
+        (newslash == cwd || !isdirsep(newslash[-1])))
+        newslash--;
+
+    while (!isdirsep(*slash) && slash > from) slash--;
+    if (isdirsep(*slash)) slash++;
+
+    if (isdirsep(*newslash)) newslash--;
+    if (*newslash != '\0') {
+        while (!isdirsep(*newslash) && newslash > cwd) newslash--;
+    }
+
+    to[0] = '\0';
+    to[tolen - 1] = '\0';
+
+    while (*newslash != '\0') {
+        if (isdirsep(*newslash)) {
+            size_t curlen = strlen(to);
+            snprintf(to + curlen, (size_t)tolen - curlen, "../");
+        }
+        newslash++;
+    }
+    {
+        size_t curlen = strlen(to);
+        snprintf(to + curlen, (size_t)tolen - curlen, "%s", slash);
+    }
+
+    free(cwd_buf);
+    return 1;
+}
+
+int fl_filename_relative(char *to, int tolen, const char *from) {
+    char cwd_buf[FL_PATH_MAX];
+    if (!getcwd(cwd_buf, sizeof(cwd_buf))) {
+        snprintf(to, (size_t)tolen, "%s", from);
+        return 0;
+    }
+    return fl_filename_relative_to(to, tolen, from, cwd_buf);
 }
