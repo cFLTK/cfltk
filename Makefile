@@ -1,6 +1,22 @@
 # cfltk - plain Makefile alternative to CMakeLists.txt.
 # Builds the core library + the X11 reference backend + examples.
 
+CFLTK_VERSION := 0.1.0
+
+# Install locations, GNU-style: override any of these, or just PREFIX,
+# e.g. `make install PREFIX=$HOME/.local` or `make install DESTDIR=/tmp/stage`
+# for a staged install (DESTDIR is prepended to every path below but,
+# unlike PREFIX, is never baked into the installed .pc file).
+PREFIX     ?= /usr/local
+LIBDIR     ?= $(PREFIX)/lib
+INCLUDEDIR ?= $(PREFIX)/include
+PCDIR      ?= $(LIBDIR)/pkgconfig
+DESTDIR    ?=
+
+INSTALL      ?= install
+INSTALL_DATA ?= $(INSTALL) -m 644
+INSTALL_DIR  ?= $(INSTALL) -d
+
 CC      ?= cc
 # -Wno-missing-field-initializers: Fl_Menu_Item arrays are meant to be
 # written the same terse, positional way FLTK C++ apps write them
@@ -142,7 +158,7 @@ OBJS := $(SRCS:.c=.o)
 BUILD_DIR := build
 LIB := $(BUILD_DIR)/libcfltk.a
 
-.PHONY: all clean examples
+.PHONY: all clean examples install uninstall
 
 all: $(LIB) examples
 
@@ -185,3 +201,32 @@ examples: $(LIB)
 clean:
 	rm -f $(OBJS) $(OBJS:.o=.d) $(LIB)
 	rm -rf $(BUILD_DIR)
+
+# Installs the static library, public headers (include/cfltk/*.h, flat,
+# no subdirectories to preserve) and a pkg-config file so other
+# projects can build against an installed cfltk via
+# `pkg-config --cflags --libs cfltk` instead of hand-rolling paths and
+# link flags (including the optional libpng/libjpeg link flags, folded
+# into the .pc file's Libs.private exactly as this build resolved them
+# -- see CFLTK_ENABLE_PNG/CFLTK_ENABLE_JPEG above).
+install: $(LIB)
+	$(INSTALL_DIR) $(DESTDIR)$(LIBDIR)
+	$(INSTALL_DATA) $(LIB) $(DESTDIR)$(LIBDIR)/libcfltk.a
+	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)/cfltk
+	$(INSTALL_DATA) include/cfltk/*.h $(DESTDIR)$(INCLUDEDIR)/cfltk/
+	$(INSTALL_DIR) $(DESTDIR)$(PCDIR)
+	sed \
+	    -e 's|@PREFIX@|$(PREFIX)|g' \
+	    -e 's|@LIBDIR@|$(LIBDIR)|g' \
+	    -e 's|@INCLUDEDIR@|$(INCLUDEDIR)|g' \
+	    -e 's|@VERSION@|$(CFLTK_VERSION)|g' \
+	    -e 's|@PC_LIBS_PRIVATE@|$(X11_LIBS) $(IMG_LIBS)|g' \
+	    cfltk.pc.in > $(DESTDIR)$(PCDIR)/cfltk.pc
+	chmod 644 $(DESTDIR)$(PCDIR)/cfltk.pc
+	@echo "Installed cfltk $(CFLTK_VERSION) to $(DESTDIR)$(PREFIX)"
+	@echo "  (add $(PCDIR) to PKG_CONFIG_PATH if it's not on the default search path)"
+
+uninstall:
+	rm -f $(DESTDIR)$(LIBDIR)/libcfltk.a
+	rm -rf $(DESTDIR)$(INCLUDEDIR)/cfltk
+	rm -f $(DESTDIR)$(PCDIR)/cfltk.pc

@@ -30,6 +30,28 @@ make        # builds build/libcfltk.a and build/hello
 Requires a C99 compiler and the X11/Xft development headers
 (`libx11-dev`, `libxft-dev` on Debian/Ubuntu) for the Linux backend.
 
+## Installing
+
+Installs `libcfltk.a`, the public headers, and a `cfltk.pc` pkg-config
+file so other projects can build against it with
+`pkg-config --cflags --libs cfltk` instead of hand-rolling paths.
+
+```sh
+make install                       # PREFIX defaults to /usr/local
+make install PREFIX=$HOME/.local   # per-user install, no sudo needed
+make uninstall
+```
+
+or, with CMake:
+
+```sh
+cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
+cmake --build . --target install
+```
+
+Both accept the usual staged-install convention for packaging
+(`make install DESTDIR=/tmp/stage`, or `DESTDIR=/tmp/stage cmake --install .`).
+
 ## Layout
 
 ```

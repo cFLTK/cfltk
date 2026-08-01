@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(cfltk C)
+project(cfltk VERSION 0.1.0 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -180,6 +180,61 @@ find_library(CFLTK_MATH_LIB m)
 if(CFLTK_MATH_LIB)
     target_link_libraries(cfltk PUBLIC ${CFLTK_MATH_LIB})
 endif()
+
+# ---------------------------------------------------------------------
+# Install (`cmake --build . --target install`, or plain `make install`
+# in a Makefile-generator build directory)
+# ---------------------------------------------------------------------
+
+include(GNUInstallDirs)
+
+install(TARGETS cfltk ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(DIRECTORY include/cfltk DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+# Mirrors what got linked into the cfltk target above, so an installed
+# `pkg-config --libs cfltk` resolves to the same flags this build used
+# (X11/Xft always; libpng/libjpeg only if CFLTK_ENABLE_PNG/_JPEG ended
+# up ON; libm if found) -- keeps the plain Makefile's `make install`
+# and this one producing an equivalent cfltk.pc.
+#
+# Deliberately using the *_LDFLAGS variables here, not *_LIBRARIES:
+# pkg_check_modules() fills _LIBRARIES with bare names ("X11", "Xft",
+# not "-lX11"), which is fine for target_link_libraries() above (CMake
+# adds the -l itself) but would land in the .pc file's Libs.private as
+# invalid, non-flag tokens. _LDFLAGS is already fully formatted
+# ("-lX11 ..."), matching what plain `pkg-config --libs` would emit.
+set(CFLTK_PC_LIBS_PRIVATE "")
+if(CFLTK_BACKEND_X11)
+    list(APPEND CFLTK_PC_LIBS_PRIVATE ${X11_LDFLAGS} ${XFT_LDFLAGS})
+endif()
+if(CFLTK_ENABLE_PNG)
+    list(APPEND CFLTK_PC_LIBS_PRIVATE ${PNG_LDFLAGS})
+endif()
+if(CFLTK_ENABLE_JPEG)
+    list(APPEND CFLTK_PC_LIBS_PRIVATE ${JPEG_LDFLAGS})
+endif()
+if(CFLTK_MATH_LIB)
+    list(APPEND CFLTK_PC_LIBS_PRIVATE ${CFLTK_MATH_LIB})
+endif()
+list(JOIN CFLTK_PC_LIBS_PRIVATE " " CFLTK_PC_LIBS_PRIVATE)
+
+# cfltk.pc.in's placeholders (@PREFIX@ etc.) are named to match the
+# plain Makefile's `sed` substitution one-for-one -- see its `install`
+# target -- so both build systems generate the same file shape from
+# the same template. configure_file(@ONLY) substitutes @VAR@ with the
+# CMake variable VAR, hence these short, template-matching names.
+set(PREFIX ${CMAKE_INSTALL_PREFIX})
+set(LIBDIR ${CMAKE_INSTALL_FULL_LIBDIR})
+set(INCLUDEDIR ${CMAKE_INSTALL_FULL_INCLUDEDIR})
+set(VERSION ${PROJECT_VERSION})
+set(PC_LIBS_PRIVATE ${CFLTK_PC_LIBS_PRIVATE})
+configure_file(cfltk.pc.in cfltk.pc @ONLY)
+unset(PREFIX)
+unset(LIBDIR)
+unset(INCLUDEDIR)
+unset(VERSION)
+unset(PC_LIBS_PRIVATE)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/cfltk.pc DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
 # ---------------------------------------------------------------------
 # Examples
