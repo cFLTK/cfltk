@@ -54,6 +54,10 @@ typedef struct MenuPopupState {
     const Fl_Menu_Item *result;
     int active;
     int seen_push;
+    /* Union of every level rectangle shown so far this session, in
+     * absolute (root) coordinates. The window is only ever grown to
+     * this, never shrunk -- see recompute_window_bounds(). */
+    int union_x, union_y, union_x2, union_y2;
 } MenuPopupState;
 
 static MenuPopupState g_menu;
@@ -175,7 +179,26 @@ static void recompute_window_bounds(void) {
         if (lv->x + lv->w > maxx) maxx = lv->x + lv->w;
         if (lv->y + lv->h > maxy) maxy = lv->y + lv->h;
     }
-    Fl_Widget_resize(FL_WIDGET(g_menu.win), minx, miny, maxx - minx, maxy - miny);
+
+    /* Grow the running union to cover the current levels; never shrink
+     * it. If the window instead tracked only the *current* levels'
+     * bbox, moving from one top-level menu to another (File -> Edit)
+     * would shrink/move the window away from screen area it had
+     * already drawn the old dropdown into, and nothing is guaranteed
+     * to repaint that area afterwards (this popup is an
+     * override-redirect window with no window manager involved, and
+     * Expose delivery to whatever's behind it isn't reliable enough to
+     * depend on) -- the old dropdown would visibly linger. Staying at
+     * the session's max-ever footprint and always fully repainting the
+     * window's background (popup_draw()) turns that into a plain
+     * redraw instead of a cross-window exposure problem. */
+    if (minx < g_menu.union_x) g_menu.union_x = minx;
+    if (miny < g_menu.union_y) g_menu.union_y = miny;
+    if (maxx > g_menu.union_x2) g_menu.union_x2 = maxx;
+    if (maxy > g_menu.union_y2) g_menu.union_y2 = maxy;
+
+    Fl_Widget_resize(FL_WIDGET(g_menu.win), g_menu.union_x, g_menu.union_y,
+                      g_menu.union_x2 - g_menu.union_x, g_menu.union_y2 - g_menu.union_y);
     Fl_Widget_redraw(FL_WIDGET(g_menu.win));
 }
 
@@ -425,6 +448,11 @@ static const Fl_Menu_Item *run(const Fl_Menu_Item *self, int x, int y, int w, in
         g_menu.levels[0].w = w; /* pulldown at least as wide as its anchor button */
     }
     g_menu.nlevels = 1;
+
+    g_menu.union_x = g_menu.levels[0].x;
+    g_menu.union_y = g_menu.levels[0].y;
+    g_menu.union_x2 = g_menu.levels[0].x + g_menu.levels[0].w;
+    g_menu.union_y2 = g_menu.levels[0].y + g_menu.levels[0].h;
 
     g_menu.win = Fl_Window_new(g_menu.levels[0].x, g_menu.levels[0].y, g_menu.levels[0].w, g_menu.levels[0].h, NULL);
     Fl_Group_end(&g_menu.win->group);
