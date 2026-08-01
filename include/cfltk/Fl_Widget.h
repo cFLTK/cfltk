@@ -196,6 +196,10 @@ int  Fl_Widget_handle(Fl_Widget *self, int event);
 void Fl_Widget_resize(Fl_Widget *self, int x, int y, int w, int h);
 void Fl_Widget_show(Fl_Widget *self);
 void Fl_Widget_hide(Fl_Widget *self);
+/* Resizes only if the geometry actually changed, then redraws. Returns
+ * non-zero if it did. Used by Fl_Browser_ to reposition its scrollbars
+ * without an unconditional redraw on every draw() pass. */
+int Fl_Widget_damage_resize(Fl_Widget *self, int x, int y, int w, int h);
 
 /* Default handle()/resize()/show()/hide() bodies, exposed so subclasses
  * that override one virtual can still call "the base class version" the

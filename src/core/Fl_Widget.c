@@ -98,6 +98,13 @@ void Fl_Widget_resize(Fl_Widget *self, int x, int y, int w, int h) {
     else Fl_Widget_default_resize(self, x, y, w, h);
 }
 
+int Fl_Widget_damage_resize(Fl_Widget *self, int x, int y, int w, int h) {
+    if (self->x == x && self->y == y && self->w == w && self->h == h) return 0;
+    Fl_Widget_resize(self, x, y, w, h);
+    Fl_Widget_redraw(self);
+    return 1;
+}
+
 void Fl_Widget_show(Fl_Widget *self) {
     if (self->ops && self->ops->show) self->ops->show(self);
     else Fl_Widget_default_show(self);

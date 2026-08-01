@@ -342,6 +342,9 @@ static inline Fl_Color fl_gray_color(uchar g) {
 #define FL_BUTTON3   0x04000000
 #define FL_BUTTONS   0x7f000000
 #define FL_KEY_MASK  0x0000ffff
+/* Upstream aliases FL_COMMAND to FL_META on macOS, FL_CTRL everywhere
+ * else (WIN32/X11) -- cfltk only targets the latter. */
+#define FL_COMMAND   FL_CTRL
 
 #ifdef __cplusplus
 }

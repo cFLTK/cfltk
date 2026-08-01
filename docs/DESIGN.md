@@ -64,6 +64,9 @@ under an isolated X11 display):
 | `Fl_Adjuster` | `include/cfltk/Fl_Adjuster.h`, `src/valuators/Fl_Adjuster.c` |
 | `Fl_Tabs` | `include/cfltk/Fl_Tabs.h`, `src/widgets/Fl_Tabs.c` |
 | `Fl_Scroll` | `include/cfltk/Fl_Scroll.h`, `src/widgets/Fl_Scroll.c` |
+| `Fl_Browser_` | `include/cfltk/Fl_Browser_.h`, `src/widgets/Fl_Browser_.c` |
+| `Fl_Browser` | `include/cfltk/Fl_Browser.h`, `src/widgets/Fl_Browser.c` |
+| `Fl_Select_Browser` / `Fl_Hold_Browser` / `Fl_Multi_Browser` | `include/cfltk/Fl_{Select,Hold,Multi}_Browser.h`, `src/widgets/Fl_{Select,Hold,Multi}_Browser.c` |
 
 ## Cross-cutting translation rules
 
@@ -316,6 +319,43 @@ under an isolated X11 display):
   lockstep with the GC clip. Any future backend (NuttX/NX) implementing
   its own text renderer needs the equivalent: whatever draws text must
   honor the same clip state as whatever draws shapes.
+- **`Fl_Browser_`'s pure-virtual `item_*()` methods become a second,
+  item-level vtable** (`Fl_Browser_ItemOps`) alongside the normal
+  widget-level `Fl_WidgetOps` -- this class genuinely has two orthogonal
+  axes of virtual behavior (how it draws/handles as a *widget*, shared
+  by every concrete browser and implemented once in `Fl_Browser_.c`;
+  and how its *items* are stored/measured/drawn, which is what
+  `Fl_Browser` -- and any future `Fl_Check_Browser`/`Fl_File_Browser` --
+  actually varies). Optional item-ops entries left NULL fall back to
+  the same default behavior the corresponding upstream virtual's
+  default body provides. See `Fl_Browser_.h`.
+- **`Fl_Browser` has no icon support** (`Fl_Browser::icon()`, and the
+  `Fl_Image *icon` field every upstream `FL_BLINE` carries) -- cfltk
+  has no `Fl_Image` yet (see "No images" above). `FL_BLINE` has no icon
+  field; `item_height()`/`item_width()`/`item_draw()` skip the
+  icon-measurement/drawing branches entirely. The '@'-prefixed inline
+  text-format codes (font/size/color/alignment/underline/strikethrough/
+  background-fill) are fully ported, though -- that mini-language only
+  needed `fl_font`/`fl_color`/`fl_line`/`fl_rectf`/`fl_label_draw`,
+  which cfltk already has, unlike the separate `fl_draw_symbol()`
+  '@'-glyph language used for e.g. `Fl_Counter`'s arrows, which is not
+  ported.
+- **`Fl_Browser::load(filename)` is not ported** -- a thin wrapper over
+  `fopen()`/`fgets()`/`add()` a caller can trivially write against the
+  public `add()` API; no client needs it yet.
+- **Fixed while building `Fl_Browser`: text measurement crashed before
+  any window was shown.** `fl_graphics_driver()` returned NULL until
+  `Fl_Widget_show()` on some window ran `fl_backend_init()` as a side
+  effect -- fine for widgets that only measure/draw text from their own
+  `draw()`, but `Fl_Browser_add()` calls `item_height()`/`item_width()`
+  (hence `fl_font()`) immediately, at insertion time, which is normal
+  FLTK usage: populate widgets, `show()` the window, then `Fl_run()`.
+  Building the browser example crashed on the very first `add()` call
+  before any window was on screen. Fixed by making `fl_graphics_driver()`
+  itself lazily call `fl_backend_init()` on first use (`src/draw/fl_draw.c`),
+  matching upstream's implicit `fl_open_display()`-on-first-use behavior --
+  the display connection and font system have no real dependency on any
+  particular window existing.
 - **Upstream's multi-segment `fl_xyline`/`fl_yxline` overloads** (the
   4/5-argument forms that draw a connected two- or three-segment path —
   e.g. vertical-then-horizontal — in one call) have no cfltk equivalent;
@@ -327,7 +367,8 @@ under an isolated X11 display):
 
 ## Next phases (not started)
 
-1. More widgets: `Fl_Browser_`, `Fl_Text_Buffer`/`Fl_Text_Editor`.
+1. More widgets: `Fl_Check_Browser`, `Fl_File_Browser` (needs `Fl_Image`
+   first, for icons), `Fl_Text_Buffer`/`Fl_Text_Editor`.
 2. `Fl_Image` + image loaders (behind a compile-time switch).
 3. The rest of the official FLTK example suite (see the contract's
    "Required Validation Programs" list), each one both a port target

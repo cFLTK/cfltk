@@ -13,11 +13,23 @@
 
 #include "cfltk/fl_draw.h"
 #include "cfltk/fl_colormap.h"
+#include "../backend/fl_backend.h"
 
 static const Fl_Graphics_Driver *g_driver = NULL;
 
 void fl_set_graphics_driver(const Fl_Graphics_Driver *driver) { g_driver = driver; }
-const Fl_Graphics_Driver *fl_graphics_driver(void) { return g_driver; }
+
+/* Lazily opens the display/installs the driver on first use, exactly
+ * like upstream's fl_open_display() being called implicitly by font
+ * measurement -- this is what lets client code measure text (e.g.
+ * Fl_Browser building its item list) before any window is shown, a
+ * very common FLTK usage pattern. Previously this only happened as a
+ * side effect of Fl_Widget_show() on a window, which crashed any code
+ * that measured text first (fl_graphics_driver() returning NULL). */
+const Fl_Graphics_Driver *fl_graphics_driver(void) {
+    if (!g_driver) fl_backend_init();
+    return g_driver;
+}
 
 /* ------------------------------------------------------------------ */
 /* Color math (src/fl_color.cxx)                                       */

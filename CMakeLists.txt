@@ -45,6 +45,11 @@ set(CFLTK_CORE_SOURCES
     src/widgets/Fl_Multiline_Output.c
     src/widgets/Fl_Tabs.c
     src/widgets/Fl_Scroll.c
+    src/widgets/Fl_Browser_.c
+    src/widgets/Fl_Browser.c
+    src/widgets/Fl_Select_Browser.c
+    src/widgets/Fl_Hold_Browser.c
+    src/widgets/Fl_Multi_Browser.c
     src/menu/Fl_Menu_Item.c
     src/menu/Fl_Menu_.c
     src/menu/fl_menu_popup.c
@@ -127,4 +132,7 @@ if(CFLTK_BUILD_EXAMPLES)
 
     add_executable(tabs_scroll examples/tabs_scroll/tabs_scroll.c)
     target_link_libraries(tabs_scroll PRIVATE cfltk)
+
+    add_executable(browser examples/browser/browser.c)
+    target_link_libraries(browser PRIVATE cfltk)
 endif()
