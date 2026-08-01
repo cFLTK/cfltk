@@ -79,6 +79,7 @@ set(CFLTK_CORE_SOURCES
     src/menu/Fl_Choice.c
     src/menu/Fl_Menu_Bar.c
     src/draw/fl_draw.c
+    src/draw/fl_symbols.c
     src/draw/fl_colormap.c
     src/valuators/Fl_Valuator.c
     src/valuators/Fl_Slider.c

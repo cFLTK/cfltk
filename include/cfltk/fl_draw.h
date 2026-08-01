@@ -15,9 +15,8 @@
  * Ownership       : the driver struct is backend-owned static storage;
  *                    cfltk never allocates or frees it.
  * Known differences:
- *   - No matrix/transform stack (fl_push_matrix family), no complex
- *     polygons, no offscreen/print surfaces yet -- out of scope for the
- *     Linux reference backend's first pass. See docs/DESIGN.md.
+ *   - No offscreen/print surfaces yet -- out of scope for the Linux
+ *     reference backend's first pass. See docs/DESIGN.md.
  *   - draw_image()/read_image() (added for Fl_RGB_Image) always blit
  *     straight to the current drawable -- there is no cached/offscreen
  *     image surface (upstream's per-image `id_`/`Fl_Offscreen` cache).
@@ -102,6 +101,16 @@ typedef struct Fl_Graphics_Driver {
      * full bitmap's own dimensions (needed to compute the stipple
      * origin/wrap). */
     void (*draw_bitmask)(const unsigned char *bits, int bmp_w, int bmp_h, int cx, int cy, int x, int y, int w, int h);
+
+    /* Arbitrary-N-point fill/stroke, backing the portable vertex/matrix
+     * drawing layer below (fl_begin_polygon()/fl_vertex()/...) --
+     * unlike line3/loop3/polygon3 (hardcoded to exactly 3 points, used
+     * by the older fl_line()/fl_loop()/fl_polygon() convenience calls
+     * still used directly by some box types), these take a point count.
+     * `closed` for draw_polyline: 0 = open polyline (XDrawLines-style),
+     * 1 = closed loop (last point connects back to the first). */
+    void (*fill_polygon)(const int *xs, const int *ys, int n);
+    void (*draw_polyline)(const int *xs, const int *ys, int n, int closed);
 } Fl_Graphics_Driver;
 
 /* Installed by the platform backend before any drawing happens. */
@@ -221,6 +230,57 @@ static inline void fl_read_image(unsigned char *buf, int x, int y, int w, int h,
 static inline void fl_draw_bitmask(const unsigned char *bits, int bmp_w, int bmp_h, int cx, int cy, int x, int y, int w, int h) {
     fl_graphics_driver()->draw_bitmask(bits, bmp_w, bmp_h, cx, cy, x, y, w, h);
 }
+
+/* ------------------------------------------------------------------ */
+/* Portable vertex/matrix drawing (new; ported from src/fl_vertex.cxx  */
+/* and the portable half of src/fl_arc.cxx). A small 2D affine         */
+/* transform stack plus a begin/vertex/end path-building API, used by  */
+/* fl_draw_symbol() (see fl_symbols.h) to draw the '@'-prefixed label   */
+/* glyphs (arrows, etc.) at any position/size/rotation from a single   */
+/* small set of vertices in a fixed -1..1 coordinate system. Portable  */
+/* (backend-independent) code living in fl_draw.c, built on the new    */
+/* fill_polygon/draw_polyline driver primitives above plus the         */
+/* existing arc/pie ones.                                              */
+/*                                                                      */
+/* Known difference: fl_begin_complex_polygon()/fl_gap() do not        */
+/* actually support multiple contours/holes -- end_complex_polygon()   */
+/* fills the same way end_polygon() does. None of the symbols ported   */
+/* in fl_symbols.c need a hole (upstream's own symbol set never calls  */
+/* fl_gap() either), so this is unexercised rather than narrowed.      */
+/* ------------------------------------------------------------------ */
+
+void fl_push_matrix(void);
+void fl_pop_matrix(void);
+void fl_mult_matrix(double a, double b, double c, double d, double x, double y);
+void fl_translate(double x, double y);
+void fl_scale(double x, double y);
+void fl_rotate(double d); /* degrees */
+
+void fl_begin_points(void);
+void fl_begin_line(void);
+void fl_begin_loop(void);
+void fl_begin_polygon(void);
+void fl_begin_complex_polygon(void);
+void fl_vertex(double x, double y);
+void fl_circle(double x, double y, double r); /* adds to the current path if one is open, else draws standalone */
+void fl_gap(void); /* no-op, see above */
+void fl_end_points(void);
+void fl_end_line(void);
+void fl_end_loop(void);
+void fl_end_polygon(void);
+void fl_end_complex_polygon(void);
+
+double fl_transform_x(double x, double y);
+double fl_transform_y(double x, double y);
+
+/* '@'-prefixed label glyphs (src/fl_symbols.cxx), built on the vertex/
+ * matrix layer above. name excludes the leading '@'. Known difference:
+ * "returnarrow" is not registered -- Fl_Return_Button already has its
+ * own private, working arrow decoration (fl_return_arrow() static
+ * helper in Fl_Return_Button.c); exposing it under this name too is
+ * out of scope. See docs/DESIGN.md. */
+int fl_add_symbol(const char *name, void (*drawit)(Fl_Color), int scalable);
+int fl_draw_symbol(const char *label, int x, int y, int w, int h, Fl_Color col);
 
 /* ------------------------------------------------------------------ */
 /* Box drawing (fl_box_table[boxtype], same spirit as upstream)        */

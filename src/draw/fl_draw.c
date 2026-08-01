@@ -8,6 +8,9 @@
  * display -- fl_graphics_driver itself -- is installed by the platform
  * backend (src/backend/x11/fl_x11_driver.c).
  */
+#include <ctype.h>
+#include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -74,6 +77,176 @@ Fl_Color fl_contrast(Fl_Color fg, Fl_Color bg) {
 
 void fl_draw(const char *str, int x, int y) {
     if (str) fl_draw_text(str, (int)strlen(str), x, y);
+}
+
+/* ------------------------------------------------------------------ */
+/* Portable vertex/matrix drawing (src/fl_vertex.cxx)                  */
+/*                                                                      */
+/* All state below is file-static rather than per-driver-instance: */
+/* cfltk's Fl_Graphics_Driver is a stateless vtable (the backend        */
+/* installs one shared const struct), so the matrix stack and path      */
+/* point buffer -- both genuinely mutable, per-call state in upstream's */
+/* Fl_Graphics_Driver object -- live here instead, in the portable      */
+/* (backend-independent) layer that owns this API. Not thread-safe,     */
+/* matching upstream (FLTK drawing is single-threaded by design).       */
+/* ------------------------------------------------------------------ */
+
+#ifndef CFLTK_PI
+#define CFLTK_PI 3.14159265358979323846
+#endif
+
+typedef struct { double a, b, c, d, x, y; } Fl_Matrix;
+
+#define MATRIX_STACK_SIZE 32
+static Fl_Matrix s_matrix_stack[MATRIX_STACK_SIZE];
+static int s_matrix_sp = 0;
+static Fl_Matrix s_matrix = { 1, 0, 0, 1, 0, 0 };
+
+enum { V_POINT, V_LINE, V_LOOP, V_POLYGON };
+static int s_what = V_POINT;
+static int s_gap = 0;
+
+static int *s_px = NULL, *s_py = NULL;
+static int s_pn = 0, s_psize = 0;
+
+void fl_push_matrix(void) {
+    if (s_matrix_sp == MATRIX_STACK_SIZE) {
+        fprintf(stderr, "cfltk: fl_push_matrix(): matrix stack overflow\n");
+    } else {
+        s_matrix_stack[s_matrix_sp++] = s_matrix;
+    }
+}
+
+void fl_pop_matrix(void) {
+    if (s_matrix_sp == 0) {
+        fprintf(stderr, "cfltk: fl_pop_matrix(): matrix stack underflow\n");
+    } else {
+        s_matrix = s_matrix_stack[--s_matrix_sp];
+    }
+}
+
+void fl_mult_matrix(double a, double b, double c, double d, double x, double y) {
+    Fl_Matrix o;
+    o.a = a * s_matrix.a + b * s_matrix.c;
+    o.b = a * s_matrix.b + b * s_matrix.d;
+    o.c = c * s_matrix.a + d * s_matrix.c;
+    o.d = c * s_matrix.b + d * s_matrix.d;
+    o.x = x * s_matrix.a + y * s_matrix.c + s_matrix.x;
+    o.y = x * s_matrix.b + y * s_matrix.d + s_matrix.y;
+    s_matrix = o;
+}
+
+void fl_translate(double x, double y) { fl_mult_matrix(1, 0, 0, 1, x, y); }
+void fl_scale(double x, double y) { fl_mult_matrix(x, 0, 0, y, 0, 0); }
+
+void fl_rotate(double d) {
+    double s, c;
+    if (!d) return;
+    if (d == 90) { s = 1; c = 0; }
+    else if (d == 180) { s = 0; c = -1; }
+    else if (d == 270 || d == -90) { s = -1; c = 0; }
+    else { s = sin(d * CFLTK_PI / 180.0); c = cos(d * CFLTK_PI / 180.0); }
+    fl_mult_matrix(c, -s, s, c, 0, 0);
+}
+
+double fl_transform_x(double x, double y) { return x * s_matrix.a + y * s_matrix.c + s_matrix.x; }
+double fl_transform_y(double x, double y) { return x * s_matrix.b + y * s_matrix.d + s_matrix.y; }
+
+/* Appends an already-transformed, already-rounded point, skipping if
+ * it duplicates the last one (matches upstream's transformed_vertex0,
+ * which keeps XFillPolygon/XDrawLines from choking on zero-length
+ * segments). */
+static void push_point(int x, int y) {
+    if (s_pn > 0 && x == s_px[s_pn - 1] && y == s_py[s_pn - 1]) return;
+    if (s_pn >= s_psize) {
+        s_psize = s_px ? s_psize * 2 : 16;
+        s_px = (int *)realloc(s_px, (size_t)s_psize * sizeof(int));
+        s_py = (int *)realloc(s_py, (size_t)s_psize * sizeof(int));
+    }
+    s_px[s_pn] = x;
+    s_py[s_pn] = y;
+    s_pn++;
+}
+
+static int rnd(double v) { return (int)floor(v + 0.5); }
+
+void fl_begin_points(void) { s_pn = 0; s_what = V_POINT; }
+void fl_begin_line(void) { s_pn = 0; s_what = V_LINE; }
+void fl_begin_loop(void) { s_pn = 0; s_what = V_LOOP; }
+void fl_begin_polygon(void) { s_pn = 0; s_what = V_POLYGON; }
+void fl_begin_complex_polygon(void) { s_pn = 0; s_what = V_POLYGON; s_gap = 0; }
+
+void fl_vertex(double x, double y) {
+    push_point(rnd(x * s_matrix.a + y * s_matrix.c + s_matrix.x),
+               rnd(x * s_matrix.b + y * s_matrix.d + s_matrix.y));
+}
+
+void fl_gap(void) {
+    while (s_pn > s_gap + 2 && s_px[s_pn - 1] == s_px[s_gap] && s_py[s_pn - 1] == s_py[s_gap]) s_pn--;
+    if (s_pn > s_gap + 2) {
+        push_point(s_px[s_gap], s_py[s_gap]);
+        s_gap = s_pn;
+    } else {
+        s_pn = s_gap;
+    }
+}
+
+/* Removes trailing points that duplicate the first, so a caller that
+ * already closed the path manually (last vertex == first vertex)
+ * doesn't get a degenerate zero-length closing segment. */
+static void fixloop(void) {
+    while (s_pn > 2 && s_px[s_pn - 1] == s_px[0] && s_py[s_pn - 1] == s_py[0]) s_pn--;
+}
+
+void fl_end_points(void) {
+    int i;
+    for (i = 0; i < s_pn; i++) fl_graphics_driver()->point(s_px[i], s_py[i]);
+}
+
+void fl_end_line(void) {
+    if (s_pn < 2) { fl_end_points(); return; }
+    fl_graphics_driver()->draw_polyline(s_px, s_py, s_pn, 0);
+}
+
+void fl_end_loop(void) {
+    fixloop();
+    if (s_pn > 2) push_point(s_px[0], s_py[0]);
+    fl_end_line();
+}
+
+void fl_end_polygon(void) {
+    fixloop();
+    if (s_pn < 3) { fl_end_line(); return; }
+    fl_graphics_driver()->fill_polygon(s_px, s_py, s_pn);
+}
+
+void fl_end_complex_polygon(void) {
+    fl_gap();
+    if (s_pn < 3) { fl_end_line(); return; }
+    fl_graphics_driver()->fill_polygon(s_px, s_py, s_pn);
+}
+
+/* Shortcuts closed circles to an arc/pie call (matching upstream);
+ * does not draw rotated ellipses correctly under a skewed matrix --
+ * same documented upstream limitation. Fills if called between
+ * fl_begin_polygon()/fl_end_polygon() (or _complex_polygon), strokes
+ * otherwise -- tracked via the same s_what left over from the last
+ * begin/end pair, exactly mirroring upstream's use of its `what`
+ * member as ambient state for standalone fl_circle() calls. */
+void fl_circle(double x, double y, double r) {
+    double xt = fl_transform_x(x, y);
+    double yt = fl_transform_y(x, y);
+    double rx = r * (s_matrix.c != 0 ? sqrt(s_matrix.a * s_matrix.a + s_matrix.c * s_matrix.c) : fabs(s_matrix.a));
+    double ry = r * (s_matrix.b != 0 ? sqrt(s_matrix.b * s_matrix.b + s_matrix.d * s_matrix.d) : fabs(s_matrix.d));
+    int llx = rnd(xt - rx);
+    int w = rnd(xt + rx) - llx;
+    int lly = rnd(yt - ry);
+    int h = rnd(yt + ry) - lly;
+    if (s_what == V_POLYGON) {
+        fl_pie(llx, lly, w, h, 0, 360);
+    } else {
+        fl_arc(llx, lly, w, h, 0, 360);
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -280,16 +453,68 @@ static int strip_shortcut_marker(const char *in, char *out, int outcap, int *und
     return oi;
 }
 
+/* Splits a leading and/or trailing '@symbol' off `buf` (already past
+ * strip_shortcut_marker()), matching the two cases upstream's fl_draw()
+ * detects (src/fl_draw.cxx): a label starting with "@name " (symbol
+ * name terminated by whitespace, which is consumed) and/or a label
+ * ending in "@name" (found via the last '@' at least 2 bytes in, so a
+ * leading symbol's own '@' is never mistaken for a trailing one).
+ * "@@" is never treated as a symbol start (escape, matching upstream),
+ * though -- unlike upstream's full multi-line engine -- a literal "@@"
+ * elsewhere in running text is not collapsed to one '@' here (out of
+ * scope for this single-line label engine; see docs/DESIGN.md).
+ * *text_out points into buf (possibly past a consumed leading symbol,
+ * and NUL-truncated before a trailing one). Adjusts *underline (from
+ * strip_shortcut_marker) if it fell inside consumed/removed text. */
+static void extract_symbols(char *buf, char **text_out, char *sym0, size_t sym0cap,
+                             char *sym1, size_t sym1cap, int *underline) {
+    char *p = buf;
+    sym0[0] = '\0';
+    sym1[0] = '\0';
+    if (p[0] == '@' && p[1] && p[1] != '@') {
+        char *s = sym0;
+        char *q = p;
+        while (*q && !isspace((unsigned char)*q) && (size_t)(s - sym0) < sym0cap - 1) *s++ = *q++;
+        *s = '\0';
+        if (isspace((unsigned char)*q)) q++;
+        if (*underline >= 0) {
+            int consumed = (int)(q - p);
+            if (*underline >= consumed) *underline -= consumed;
+            else *underline = -1;
+        }
+        p = q;
+    }
+    {
+        char *p2 = strrchr(p, '@');
+        if (p2 && p2 > p + 1 && p2[-1] != '@') {
+            size_t n = sym1cap - 1;
+            size_t avail = strlen(p2);
+            if (n > avail) n = avail;
+            memcpy(sym1, p2, n);
+            sym1[n] = '\0';
+            if (*underline >= 0 && (p + *underline) >= p2) *underline = -1;
+            *p2 = '\0';
+        }
+    }
+    *text_out = p;
+}
+
 void fl_label_measure(const Fl_Label *label, int *w, int *h) {
-    char buf[512];
-    int underline;
+    char buf[512], sym0[64], sym1[64], *text;
+    int underline = -1;
+    int symw0 = 0, symw1 = 0, lw = 0, lh = 0;
     *w = 0;
     *h = 0;
     if (label->value && label->value[0]) {
         fl_font(label->font, label->size);
         strip_shortcut_marker(label->value, buf, (int)sizeof(buf), &underline);
-        *w = (int)fl_width_str(buf);
-        *h = fl_height();
+        extract_symbols(buf, &text, sym0, sizeof(sym0), sym1, sizeof(sym1), &underline);
+        if (sym0[0]) symw0 = fl_height();
+        if (sym1[0]) symw1 = fl_height();
+        if (text[0]) { lw = (int)fl_width_str(text); lh = fl_height(); }
+        else if (symw0 || symw1) lh = fl_height();
+        *w = symw0 + lw + symw1;
+        *h = lh;
     }
     if (label->image) {
         int iw = Fl_Image_w(label->image), ih = Fl_Image_h(label->image);
@@ -304,15 +529,19 @@ void fl_label_measure(const Fl_Label *label, int *w, int *h) {
  * FL_ALIGN_TEXT_OVER_IMAGE, or draws image-only / text-only when the
  * other is absent -- covering the overwhelming majority of real
  * widget labels (icon-only toolbar buttons, and text-with-icon
- * buttons/menu items). Known differences: no FL_ALIGN_IMAGE_NEXT_TO_TEXT
- * side-by-side layout, no '@'-prefixed inline symbol glyphs in labels
- * (fl_draw_symbol()'s mini-language -- distinct from Fl_Browser's own
- * '@'-format codes, which ARE ported, see docs/DESIGN.md), no
- * multi-line wrap (pre-existing text-only limitation, unchanged). */
+ * buttons/menu items). A leading and/or trailing '@symbol' in the text
+ * is drawn as a glyph (fl_draw_symbol(), see extract_symbols() above)
+ * sized to the font's line height, laid out immediately beside the
+ * remaining text with no gap, matching upstream's single-line spacing.
+ * Known differences: no FL_ALIGN_IMAGE_NEXT_TO_TEXT side-by-side
+ * image+text layout, no multi-line wrap (pre-existing text-only
+ * limitation, unchanged) -- so a symbol is only ever recognized at the
+ * very start/end of the whole (single-line) label, not per-line. */
 void fl_label_draw(const Fl_Label *label, int x, int y, int w, int h, Fl_Align align) {
     int lw = 0, lh = 0, lx = 0, ly, underline = -1, dn = 0, baseline;
     int imgw = 0, imgh = 0, total_h, top;
-    char buf[512];
+    int symw0 = 0, symw1 = 0;
+    char buf[512], sym0[64], sym1[64], *text = buf;
     int has_text = label->value && label->value[0] ? 1 : 0;
     Fl_Image *img = (align & FL_ALIGN_IMAGE_BACKDROP) ? NULL : label->image;
     int text_over_image = (align & FL_ALIGN_TEXT_OVER_IMAGE) ? 1 : 0;
@@ -323,10 +552,16 @@ void fl_label_draw(const Fl_Label *label, int x, int y, int w, int h, Fl_Align a
     fl_font(label->font, label->size);
     fl_color(label->color);
 
+    buf[0] = '\0';
     if (has_text) {
-        dn = strip_shortcut_marker(label->value, buf, (int)sizeof(buf), &underline);
-        lw = (int)fl_width_str(buf);
-        lh = fl_height();
+        strip_shortcut_marker(label->value, buf, (int)sizeof(buf), &underline);
+        extract_symbols(buf, &text, sym0, sizeof(sym0), sym1, sizeof(sym1), &underline);
+        dn = (int)strlen(text);
+        if (sym0[0]) symw0 = fl_height();
+        if (sym1[0]) symw1 = fl_height();
+        has_text = text[0] ? 1 : 0;
+        if (has_text) { lw = (int)fl_width_str(text); lh = fl_height(); }
+        else if (symw0 || symw1) lh = fl_height();
     }
     if (img) { imgw = Fl_Image_w(img); imgh = Fl_Image_h(img); }
 
@@ -345,18 +580,33 @@ void fl_label_draw(const Fl_Label *label, int x, int y, int w, int h, Fl_Align a
         top += imgh;
     }
 
-    if (has_text) {
-        if (align & FL_ALIGN_LEFT) lx = x;
-        else if (align & FL_ALIGN_RIGHT) lx = x + w - lw;
-        else lx = x + (w - lw) / 2;
+    if (has_text || symw0 || symw1) {
+        int block_w = symw0 + lw + symw1;
+        int bx, sx, sy;
+        if (align & FL_ALIGN_LEFT) bx = x;
+        else if (align & FL_ALIGN_RIGHT) bx = x + w - block_w;
+        else bx = x + (w - block_w) / 2;
+
         ly = top;
-        baseline = ly + fl_height() - fl_descent();
-        fl_draw_text(buf, dn, lx, baseline);
-        if (underline >= 0) {
-            int ux = lx + (int)fl_width(buf, underline);
-            int uw = (int)fl_width(buf + underline, 1);
-            if (uw < 1) uw = 1;
-            fl_line(ux, baseline + 2, ux + uw - 1, baseline + 2);
+        if (symw0) {
+            sy = ly + (lh - symw0) / 2;
+            fl_draw_symbol(sym0, bx, sy, symw0, symw0, label->color);
+        }
+        lx = bx + symw0;
+        if (has_text) {
+            baseline = ly + fl_height() - fl_descent();
+            fl_draw_text(text, dn, lx, baseline);
+            if (underline >= 0) {
+                int ux = lx + (int)fl_width(text, underline);
+                int uw = (int)fl_width(text + underline, 1);
+                if (uw < 1) uw = 1;
+                fl_line(ux, baseline + 2, ux + uw - 1, baseline + 2);
+            }
+        }
+        if (symw1) {
+            sx = bx + symw0 + lw;
+            sy = ly + (lh - symw1) / 2;
+            fl_draw_symbol(sym1, sx, sy, symw1, symw1, label->color);
         }
         top += lh;
     }

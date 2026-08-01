@@ -223,6 +223,35 @@ static void d_polygon3(int x, int y, int x1, int y1, int x2, int y2) {
     if (fl_x11_current_target) XFillPolygon(fl_x11_display, fl_x11_current_target->xid, fl_x11_current_target->gc, pts, 3, Convex, CoordModeOrigin);
 }
 
+/* Arbitrary-N-point versions backing the portable vertex/matrix layer
+ * (fl_begin_polygon()/fl_vertex()/... in fl_draw.h) -- e.g. the
+ * '@'-symbol label glyphs in fl_symbols.c. Uses a small fixed-size
+ * stack buffer for the common case (every symbol shape has well under
+ * 32 vertices) and falls back to malloc for anything larger. */
+static void d_fill_polygon(const int *xs, const int *ys, int n) {
+    XPoint stackbuf[32];
+    XPoint *pts = stackbuf;
+    int i;
+    if (!fl_x11_current_target || n < 3) return;
+    if (n > 32) pts = (XPoint *)malloc(sizeof(XPoint) * (size_t)n);
+    for (i = 0; i < n; i++) { pts[i].x = (short)xs[i]; pts[i].y = (short)ys[i]; }
+    XFillPolygon(fl_x11_display, fl_x11_current_target->xid, fl_x11_current_target->gc, pts, n, Complex, CoordModeOrigin);
+    if (pts != stackbuf) free(pts);
+}
+
+static void d_draw_polyline(const int *xs, const int *ys, int n, int closed) {
+    XPoint stackbuf[32];
+    XPoint *pts = stackbuf;
+    int i, count = n;
+    if (!fl_x11_current_target || n < 2) return;
+    if (closed) count++;
+    if (count > 32) pts = (XPoint *)malloc(sizeof(XPoint) * (size_t)count);
+    for (i = 0; i < n; i++) { pts[i].x = (short)xs[i]; pts[i].y = (short)ys[i]; }
+    if (closed) { pts[n].x = (short)xs[0]; pts[n].y = (short)ys[0]; }
+    XDrawLines(fl_x11_display, fl_x11_current_target->xid, fl_x11_current_target->gc, pts, count, CoordModeOrigin);
+    if (pts != stackbuf) free(pts);
+}
+
 /* ------------------------------------------------------------------ */
 /* Fonts / text                                                        */
 /* ------------------------------------------------------------------ */
@@ -404,7 +433,8 @@ static const Fl_Graphics_Driver g_driver = {
     d_font, d_current_font, d_current_size, d_height, d_descent, d_width,
     d_draw_text,
     d_draw_image, d_read_image,
-    d_draw_bitmask
+    d_draw_bitmask,
+    d_fill_polygon, d_draw_polyline
 };
 
 const Fl_Graphics_Driver *fl_x11_graphics_driver(void) { return &g_driver; }

@@ -52,6 +52,8 @@ under an isolated X11 display):
 | Timers (`Fl::add_timeout` etc.) | `include/cfltk/Fl.h`, `src/core/Fl.c` (fixed 32-slot pool, no per-timer heap allocation) |
 | Clipboard (`Fl::copy`/`Fl::paste`) | `include/cfltk/Fl.h`, `src/core/Fl.c` (in-process only, see Known differences) |
 | `fl_draw.H` free functions | `include/cfltk/fl_draw.h`, `src/draw/fl_draw.c` |
+| Portable vertex/matrix drawing (`src/fl_vertex.cxx`: `fl_push_matrix`/`fl_begin_polygon`/`fl_vertex`/...) | `include/cfltk/fl_draw.h`, `src/draw/fl_draw.c` (file-static matrix stack/point buffer, see Known differences) |
+| `'@'`-symbol label glyphs (`src/fl_symbols.cxx`: `fl_add_symbol`/`fl_draw_symbol`, ~35 built-in shapes) | `include/cfltk/fl_draw.h`, `src/draw/fl_symbols.c` (linear-scan table, no `"returnarrow"`, see Known differences) |
 | `Enumerations.H` | `include/cfltk/Enumerations.h` |
 | default color map | `include/cfltk/fl_colormap.h`, `src/draw/fl_colormap.c` |
 | Linux/X11 platform layer | `src/backend/x11/*`, seam defined in `src/backend/fl_backend.h` |
@@ -257,6 +259,33 @@ under an isolated X11 display):
   `FL_NO_LABEL`; shadow/engraved/embossed/icon/image label types parse
   but render as plain text. `fl_label_draw()` in `src/draw/fl_draw.c`
   is the place to extend.
+- **`'@'`-symbol labels** (`fl_draw_symbol()`, `src/draw/fl_symbols.c`)
+  are recognized by `fl_label_draw()`/`fl_label_measure()` only at the
+  very start and/or very end of the whole (single-line) label text --
+  e.g. `"@< Prev"` or `"Next @>"` -- matching the two cases upstream's
+  `fl_draw()` detects, but not upstream's per-line detection inside a
+  wrapped multi-line label (cfltk's label engine doesn't wrap at all,
+  see above). A detected symbol is always drawn at `fl_height()` square
+  (the font's line height), laid out immediately beside the remaining
+  text with no gap, exactly matching upstream's single-line spacing.
+  `"@@"` at the very start correctly suppresses leading-symbol
+  detection (matching upstream's escape), but an embedded `"@@"`
+  elsewhere in running text is not collapsed to one literal `'@'`
+  (upstream's full multi-line `expand_text_()` engine does this;
+  out of scope here). The vertex/matrix layer's own matrix stack and
+  point buffer (`src/draw/fl_draw.c`) are file-static rather than
+  per-driver-instance state, since cfltk's `Fl_Graphics_Driver` is a
+  stateless shared vtable; not thread-safe, matching upstream (FLTK
+  drawing is single-threaded by design). `fl_begin_complex_polygon()`/
+  `fl_gap()` don't actually support multiple contours/holes --
+  `fl_end_complex_polygon()` fills the same way `fl_end_polygon()`
+  does -- unexercised rather than narrowed, since none of the ~35
+  symbols in `fl_symbols.c` (nor upstream's own set) ever call
+  `fl_gap()`. `"returnarrow"` is not registered in the symbol table:
+  `Fl_Return_Button` already has its own private, working
+  `fl_return_arrow()` static helper for its own decoration; exposing
+  it under this name too (for the rare case of typing `@returnarrow`
+  manually in an arbitrary label) is out of scope for this pass.
 - **Clipping** is a single intersected rectangle stack
   (`src/backend/x11/fl_x11_driver.c`), not an arbitrary X `Region`.
   Sufficient for rectangular widget damage; revisit if a widget needs
