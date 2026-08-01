@@ -103,6 +103,12 @@ void Fl_Group_deactivate_children(Fl_Group *self);
  * and want upstream's exact child-drawing behavior (e.g. Fl_Window). */
 void Fl_Group_draw_child(Fl_Group *self, Fl_Widget *w);
 void Fl_Group_draw_children(Fl_Group *self);
+/* Draws w's label if it's positioned outside w's own box (FL_ALIGN_TOP/
+ * _BOTTOM/_LEFT/_RIGHT without FL_ALIGN_INSIDE) -- upstream's file-static
+ * draw_outside_label() in Fl_Group.cxx, exposed here because Fl_Scroll's
+ * draw_clip() (and any future container with its own child-draw loop)
+ * needs it too. */
+void Fl_Group_draw_outside_label(const Fl_Widget *w);
 
 #ifdef __cplusplus
 }

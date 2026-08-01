@@ -43,6 +43,8 @@ set(CFLTK_CORE_SOURCES
     src/widgets/Fl_Secret_Input.c
     src/widgets/Fl_Output.c
     src/widgets/Fl_Multiline_Output.c
+    src/widgets/Fl_Tabs.c
+    src/widgets/Fl_Scroll.c
     src/menu/Fl_Menu_Item.c
     src/menu/Fl_Menu_.c
     src/menu/fl_menu_popup.c
@@ -122,4 +124,7 @@ if(CFLTK_BUILD_EXAMPLES)
 
     add_executable(valuators examples/valuators/valuators.c)
     target_link_libraries(valuators PRIVATE cfltk)
+
+    add_executable(tabs_scroll examples/tabs_scroll/tabs_scroll.c)
+    target_link_libraries(tabs_scroll PRIVATE cfltk)
 endif()

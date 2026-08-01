@@ -219,6 +219,10 @@ static int g_visible_focus = 1;
 int Fl_visible_focus(void) { return g_visible_focus; }
 void Fl_set_visible_focus(int v) { g_visible_focus = v; }
 
+static int g_scrollbar_size = 16;
+int Fl_scrollbar_size(void) { return g_scrollbar_size; }
+void Fl_set_scrollbar_size(int w) { g_scrollbar_size = w; }
+
 /* -------------------------------------------------------------------
  * Clipboard (in-process only, see Fl.h)
  * ---------------------------------------------------------------- */

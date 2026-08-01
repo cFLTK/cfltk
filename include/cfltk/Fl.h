@@ -71,6 +71,12 @@ int Fl_test_shortcut(Fl_Shortcut shortcut);
 int Fl_visible_focus(void);
 void Fl_set_visible_focus(int v);
 
+/* Mirrors Fl::scrollbar_size()/Fl::scrollbar_size(int): the default
+ * trough thickness (px) for scrollbars that don't set their own via
+ * Fl_Scrollbar_size(), e.g. Fl_Scroll's. Upstream defaults to 16. */
+int Fl_scrollbar_size(void);
+void Fl_set_scrollbar_size(int w);
+
 /* -------------------------------------------------------------------
  * Clipboard -- mirrors Fl::copy()/Fl::paste(), restricted to an
  * in-process buffer (clipboard 0 = mouse/PRIMARY-style selection,

@@ -62,6 +62,8 @@ under an isolated X11 display):
 | `Fl_Value_Input` | `include/cfltk/Fl_Value_Input.h`, `src/valuators/Fl_Value_Input.c` |
 | `Fl_Value_Output` | `include/cfltk/Fl_Value_Output.h`, `src/valuators/Fl_Value_Output.c` |
 | `Fl_Adjuster` | `include/cfltk/Fl_Adjuster.h`, `src/valuators/Fl_Adjuster.c` |
+| `Fl_Tabs` | `include/cfltk/Fl_Tabs.h`, `src/widgets/Fl_Tabs.c` |
+| `Fl_Scroll` | `include/cfltk/Fl_Scroll.h`, `src/widgets/Fl_Scroll.c` |
 
 ## Cross-cutting translation rules
 
@@ -286,6 +288,34 @@ under an isolated X11 display):
   embedded XBM bitmap glyphs (fastarrow/mediumarrow/slowarrow) -- the
   same kind of image-art substitution already used for `Fl_Counter`'s
   step buttons, for the same reason (no image support yet).
+- **`Fl_Tabs`** drops upstream's `Fl_Tooltip::current()`/`::enter()` calls
+  in its `FL_MOVE` handler -- cfltk has no tooltip subsystem (see above);
+  `FL_MOVE` falls through to plain `Fl_Group_handle()`, losing only the
+  per-tab-hover tooltip switch, not any layout/value/click behavior.
+- **`Fl_Scroll` has no accelerated "shift already-drawn pixels, redraw
+  only the newly exposed strip" blit** (upstream's `fl_scroll()`, backed
+  by a platform copy-area primitive cfltk hasn't ported).
+  `FL_DAMAGE_SCROLL` just redraws the whole visible content area instead
+  -- correct pixels, less efficient. Its `ScrollInfo`/`recalc_scrollbars()`
+  are also kept file-private (upstream exposes them `protected` for
+  subclasses); promote them to the header if a future cfltk subclass
+  needs them. See `Fl_Scroll.h` for the embedded-scrollbar-ownership
+  writeup (how it stays safe to `free()` only the real, heap-allocated
+  children and never the two always-embedded `Fl_Scrollbar` members).
+- **Fixed while building `Fl_Scroll`: Xft text ignored the clip stack.**
+  `fl_x11_driver.c`'s `apply_clip()` only called `XSetClipRectangles()`
+  on the plain X11 GC; text is drawn separately through an `XftDraw`
+  object (`d_draw_text()`, via `XftDrawStringUtf8()`) that has its own,
+  independent clip state and was never being told about it. Every prior
+  widget happened not to have labels positioned outside their own clip
+  region, so this was invisible until `Fl_Scroll` clipped a grid of
+  labeled boxes to a small viewport -- child labels past the visible
+  edge rendered anyway, right through box borders that *were* correctly
+  clipped (box fills/borders go through the GC, not Xft). Fixed by also
+  calling `XftDrawSetClipRectangles()`/`XftDrawSetClip(...,None)` in
+  lockstep with the GC clip. Any future backend (NuttX/NX) implementing
+  its own text renderer needs the equivalent: whatever draws text must
+  honor the same clip state as whatever draws shapes.
 - **Upstream's multi-segment `fl_xyline`/`fl_yxline` overloads** (the
   4/5-argument forms that draw a connected two- or three-segment path —
   e.g. vertical-then-horizontal — in one call) have no cfltk equivalent;
@@ -297,8 +327,7 @@ under an isolated X11 display):
 
 ## Next phases (not started)
 
-1. More widgets: `Fl_Browser_`, `Fl_Tabs`, `Fl_Scroll`,
-   `Fl_Text_Buffer`/`Fl_Text_Editor`.
+1. More widgets: `Fl_Browser_`, `Fl_Text_Buffer`/`Fl_Text_Editor`.
 2. `Fl_Image` + image loaders (behind a compile-time switch).
 3. The rest of the official FLTK example suite (see the contract's
    "Required Validation Programs" list), each one both a port target

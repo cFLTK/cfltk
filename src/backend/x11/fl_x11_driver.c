@@ -70,6 +70,7 @@ static void apply_clip(void) {
     if (!fl_x11_current_target) return;
     if (g_clip_top < 0 || !g_clip_stack[g_clip_top].active) {
         XSetClipMask(fl_x11_display, fl_x11_current_target->gc, None);
+        if (fl_x11_current_target->xft_draw) XftDrawSetClip(fl_x11_current_target->xft_draw, None);
     } else {
         XRectangle r;
         ClipRect *c = &g_clip_stack[g_clip_top];
@@ -77,6 +78,11 @@ static void apply_clip(void) {
         r.width = (unsigned short)(c->w > 0 ? c->w : 0);
         r.height = (unsigned short)(c->h > 0 ? c->h : 0);
         XSetClipRectangles(fl_x11_display, fl_x11_current_target->gc, 0, 0, &r, 1, Unsorted);
+        /* Xft text is drawn through a separate XftDraw object (see
+         * d_draw_text()) that does NOT share the GC's clip mask -- it
+         * needs its own, independently-set clip or clipped widgets'
+         * labels render straight through their box borders. */
+        if (fl_x11_current_target->xft_draw) XftDrawSetClipRectangles(fl_x11_current_target->xft_draw, 0, 0, &r, 1);
     }
 }
 

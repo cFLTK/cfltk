@@ -272,7 +272,7 @@ void Fl_Group_draw_child(Fl_Group *self, Fl_Widget *w) {
     Fl_Widget_clear_damage(w, 0);
 }
 
-static void draw_outside_label(Fl_Widget *w) {
+void Fl_Group_draw_outside_label(const Fl_Widget *w) {
     Fl_Align a = Fl_Widget_align(w);
     int lx = w->x, ly = w->y, lw = w->w, lh = w->h;
 
@@ -299,7 +299,7 @@ void Fl_Group_draw_children(Fl_Group *self) {
             fl_draw_box(Fl_Widget_box(self_w), self_w->x, self_w->y, self_w->w, self_w->h, Fl_Widget_color(self_w));
         for (i = 0; i < self->children_count; i++) {
             Fl_Widget *w = self->children_array[i];
-            draw_outside_label(w);
+            Fl_Group_draw_outside_label(w);
             Fl_Group_draw_child(self, w);
         }
     } else {

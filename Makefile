@@ -39,6 +39,8 @@ CORE_SRCS := \
     src/widgets/Fl_Secret_Input.c \
     src/widgets/Fl_Output.c \
     src/widgets/Fl_Multiline_Output.c \
+    src/widgets/Fl_Tabs.c \
+    src/widgets/Fl_Scroll.c \
     src/menu/Fl_Menu_Item.c \
     src/menu/Fl_Menu_.c \
     src/menu/fl_menu_popup.c \
@@ -100,6 +102,7 @@ examples: $(LIB)
 	$(CC) $(CFLAGS) examples/input/input.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/input
 	$(CC) $(CFLAGS) examples/menus/menus.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/menus
 	$(CC) $(CFLAGS) examples/valuators/valuators.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/valuators
+	$(CC) $(CFLAGS) examples/tabs_scroll/tabs_scroll.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/tabs_scroll
 
 clean:
 	rm -f $(OBJS) $(OBJS:.o=.d) $(LIB)
