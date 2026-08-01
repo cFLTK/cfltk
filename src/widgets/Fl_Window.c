@@ -75,6 +75,7 @@ void Fl_Window_destroy(Fl_Widget *self_w) {
 
 void Fl_Window_show(Fl_Widget *self_w) {
     Fl_Window *self = (Fl_Window *)self_w;
+    int newly_created = !self->shown;
 
     if (!self->shown) {
         if (!fl_backend_init()) return;
@@ -84,6 +85,19 @@ void Fl_Window_show(Fl_Widget *self_w) {
     }
     fl_backend_window_show(self);
     Fl_Widget_default_show(self_w);
+    if (newly_created) {
+        /* Upstream's Fl_X::make_xid() dispatches FL_SHOW unconditionally
+         * (bypassing Fl_Widget::show()'s "already visible" guard), so
+         * FL_SHOW-driven children -- e.g. Fl_Clock's 1-second ticker --
+         * start even though a freshly constructed window was never
+         * explicitly hidden. cfltk destroys (not just unmaps) the
+         * native window on hide() (see Fl_Window_hide()), so every
+         * "newly created" show() here corresponds exactly to upstream's
+         * make_xid() being called: children see FL_SHOW via
+         * Fl_Group_handle()'s cascade, matching src/Fl_x.cxx. */
+        Fl_Widget_set_visible(self_w);
+        Fl_Widget_handle(self_w, FL_SHOW);
+    }
     Fl_Widget_redraw(self_w);
 }
 

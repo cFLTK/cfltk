@@ -95,7 +95,10 @@ CORE_SRCS := \
     src/valuators/Fl_Roller.c \
     src/valuators/Fl_Value_Input.c \
     src/valuators/Fl_Value_Output.c \
-    src/valuators/Fl_Adjuster.c
+    src/valuators/Fl_Adjuster.c \
+    src/widgets/Fl_Progress.c \
+    src/widgets/Fl_Spinner.c \
+    src/widgets/Fl_Clock.c
 
 X11_SRCS := \
     src/backend/x11/fl_x11_window.c \
@@ -164,6 +167,7 @@ examples: $(LIB)
 	$(CC) $(CFLAGS) $(IMG_CFLAGS) examples/shared_image/shared_image.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) $(IMG_LIBS) -o $(BUILD_DIR)/shared_image
 	$(CC) $(CFLAGS) examples/tooltip/tooltip.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/tooltip
 	$(CC) $(CFLAGS) examples/dialogs/dialogs.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/dialogs
+	$(CC) $(CFLAGS) examples/spinner_progress_clock/spinner_progress_clock.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/spinner_progress_clock
 
 clean:
 	rm -f $(OBJS) $(OBJS:.o=.d) $(LIB)

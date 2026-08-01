@@ -67,6 +67,9 @@ under an isolated X11 display):
 | `Fl_Value_Input` | `include/cfltk/Fl_Value_Input.h`, `src/valuators/Fl_Value_Input.c` |
 | `Fl_Value_Output` | `include/cfltk/Fl_Value_Output.h`, `src/valuators/Fl_Value_Output.c` |
 | `Fl_Adjuster` | `include/cfltk/Fl_Adjuster.h`, `src/valuators/Fl_Adjuster.c` |
+| `Fl_Progress` | `include/cfltk/Fl_Progress.h`, `src/widgets/Fl_Progress.c` |
+| `Fl_Spinner` | `include/cfltk/Fl_Spinner.h`, `src/widgets/Fl_Spinner.c` |
+| `Fl_Clock_Output`/`Fl_Clock`/`Fl_Round_Clock` | `include/cfltk/Fl_Clock.h`, `src/widgets/Fl_Clock.c` |
 | `Fl_Tabs` | `include/cfltk/Fl_Tabs.h`, `src/widgets/Fl_Tabs.c` |
 | `Fl_Scroll` | `include/cfltk/Fl_Scroll.h`, `src/widgets/Fl_Scroll.c` |
 | `Fl_Pack` | `include/cfltk/Fl_Pack.h`, `src/widgets/Fl_Pack.c` |
@@ -374,6 +377,42 @@ under an isolated X11 display):
   split line metrics plus the same leading/trailing `@symbol` detection
   as `fl_label_draw()`, no mnemonic/`'&'` handling (not needed for raw
   text metrics).
+- **Bug fix: windows never dispatched `FL_SHOW` through their widget
+  tree on first display.** `Fl_Widget_default_show()`'s `FL_SHOW`
+  dispatch is guarded by `if (!Fl_Widget_visible(self))` (matching
+  upstream's own `Fl_Widget::show()`) -- but a freshly constructed
+  widget already starts visible (never explicitly hidden), so that
+  guard always skipped the dispatch for a window's very first
+  `show()`. Upstream avoids this because `Fl_Window::show()` doesn't
+  go through the base `Fl_Widget::show()` at all: `Fl_X::make_xid()`
+  (`src/Fl_x.cxx`) calls `win->handle(FL_SHOW)` *unconditionally* right
+  after mapping, explicitly commented "get child windows to appear".
+  `Fl_Group::handle()`'s own `FL_SHOW`/`FL_HIDE` case (already ported
+  correctly, see `Fl_Group_handle()` in `Fl_Group.c`) then cascades
+  the event to every visible child. Without the unconditional dispatch,
+  anything relying on `FL_SHOW` to start itself -- so far, only
+  `Fl_Clock`'s 1-second ticker -- silently never started. Fixed in
+  `Fl_Window_show()` (`Fl_Window.c`): dispatch `FL_SHOW` unconditionally
+  whenever the native window is actually (re)created, which in cfltk
+  is every real show() (`Fl_Window_hide()` destroys, not just unmaps,
+  the native window, so there's no "already-created, just remap" case
+  to distinguish from upstream's rarer one). Reproduced and confirmed
+  fixed by cropping the clock face and diffing two screenshots 8
+  seconds apart (second hand visibly advances only after the fix).
+- **`Fl_Progress`**: a direct, small translation (draw() only); no
+  behavioral differences from upstream.
+- **`Fl_Spinner`**: `input_`/`up_button_`/`down_button_` are heap-
+  allocated and added as ordinary children instead of embedded by
+  value in the struct (see `Fl_Spinner.h`'s "Ownership" note) --
+  required because cfltk's group teardown always `free()`s every
+  child, which would corrupt the heap for embedded-by-value storage;
+  invisible to callers.
+- **`Fl_Clock`**: a direct translation, including the vertex/matrix-
+  drawn hands/tick-marks (`fl_push_matrix`/`fl_rotate`/`fl_vertex`/
+  `fl_circle`, from the `fl_draw_symbol()` work above) -- no
+  behavioral differences from upstream. `Fl_Digital_Clock` was never
+  implemented upstream either ("not yet implemented", see
+  `FL_DIGITAL_CLOCK` in `Fl_Clock.h`).
 - **`Fl_Dial`'s dot/line indicator** is drawn as a plain trig-computed
   dot/needle from the hub instead of upstream's small rotated polygon
   shapes. This predates `fl_draw.h`'s push/translate/scale/rotate
