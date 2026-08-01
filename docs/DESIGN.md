@@ -94,6 +94,8 @@ under an isolated X11 display):
 | `Fl_PNG_Image` (built only when libpng is found, see `CFLTK_ENABLE_PNG`) | `include/cfltk/Fl_PNG_Image.h`, `src/image/Fl_PNG_Image.c` |
 | `Fl_JPEG_Image` (built only when libjpeg is found, see `CFLTK_ENABLE_JPEG`) | `include/cfltk/Fl_JPEG_Image.h`, `src/image/Fl_JPEG_Image.c` |
 | `Fl_Shared_Image` (+ `fl_register_images`/`fl_check_images` from `fl_images_core.cxx`) | `include/cfltk/Fl_Shared_Image.h`, `src/image/Fl_Shared_Image.c` |
+| `Fl_XPM_Image` (loads a `.xpm` file, reusing `Fl_Pixmap`) | `include/cfltk/Fl_XPM_Image.h`, `src/image/Fl_XPM_Image.c` |
+| `Fl_XBM_Image` (loads a `.xbm` file, reusing `Fl_Bitmap`) | `include/cfltk/Fl_XBM_Image.h`, `src/image/Fl_XBM_Image.c` |
 | Directory-listing utilities (new; `fl_filename_list`/`fl_numericsort`/`fl_filename_match`/`fl_filename_isdir`, collected from several small upstream files) | `include/cfltk/fl_filename.h`, `src/core/fl_filename.c` |
 | `Fl_File_Browser` (no `Fl_File_Icon`, see Known differences) | `include/cfltk/Fl_File_Browser.h`, `src/widgets/Fl_File_Browser.c` |
 | `Fl_Tooltip` | `include/cfltk/Fl_Tooltip.h`, `src/core/Fl_Tooltip.c` |
@@ -686,8 +688,9 @@ under an isolated X11 display):
   anything linking it) so client code can `#ifdef` around their use,
   as `examples/loaders/loaders.c` does.
 - **`Fl_PNG_Image`/`Fl_JPEG_Image`'s in-memory-buffer constructors
-  don't auto-register with `Fl_Shared_Image`** the way upstream's do --
-  `Fl_Shared_Image` doesn't exist in cfltk yet (see Next phases). The
+  don't auto-register with `Fl_Shared_Image`** the way upstream's do
+  (`Fl_Shared_Image` is implemented, see above, but nothing wires these
+  two loaders' in-memory-buffer constructors into its registry). The
   decode itself is fully ported.
 - **Fixed while porting `Fl_JPEG_Image`: upstream's in-memory JPEG
   reader has no real bounds checking.** Upstream hand-rolls its own

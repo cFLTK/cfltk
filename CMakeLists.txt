@@ -73,6 +73,8 @@ set(CFLTK_CORE_SOURCES
     src/image/Fl_BMP_Image.c
     src/image/Fl_GIF_Image.c
     src/image/Fl_Shared_Image.c
+    src/image/Fl_XPM_Image.c
+    src/image/Fl_XBM_Image.c
     src/menu/Fl_Menu_Item.c
     src/menu/Fl_Menu_.c
     src/menu/fl_menu_popup.c
@@ -236,4 +238,7 @@ if(CFLTK_BUILD_EXAMPLES)
 
     add_executable(input_choice_file examples/input_choice_file/input_choice_file.c)
     target_link_libraries(input_choice_file PRIVATE cfltk)
+
+    add_executable(xpm_xbm examples/xpm_xbm/xpm_xbm.c)
+    target_link_libraries(xpm_xbm PRIVATE cfltk)
 endif()

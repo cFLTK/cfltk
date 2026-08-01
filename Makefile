@@ -67,6 +67,8 @@ CORE_SRCS := \
     src/image/Fl_BMP_Image.c \
     src/image/Fl_GIF_Image.c \
     src/image/Fl_Shared_Image.c \
+    src/image/Fl_XPM_Image.c \
+    src/image/Fl_XBM_Image.c \
     src/menu/Fl_Menu_Item.c \
     src/menu/Fl_Menu_.c \
     src/menu/fl_menu_popup.c \
@@ -171,6 +173,7 @@ examples: $(LIB)
 	$(CC) $(CFLAGS) examples/dialogs/dialogs.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/dialogs
 	$(CC) $(CFLAGS) examples/spinner_progress_clock/spinner_progress_clock.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/spinner_progress_clock
 	$(CC) $(CFLAGS) examples/input_choice_file/input_choice_file.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/input_choice_file
+	$(CC) $(CFLAGS) examples/xpm_xbm/xpm_xbm.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/xpm_xbm
 
 clean:
 	rm -f $(OBJS) $(OBJS:.o=.d) $(LIB)

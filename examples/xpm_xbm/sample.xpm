@@ -1,0 +1,23 @@
+/* XPM */
+static char *sample_xpm[] = {
+"16 16 3 1",
+"  c None",
+". c #FF0000",
+"o c #0000FF",
+"................",
+".oooooooooooooo.",
+".o............o.",
+".o.oooooooooo.o.",
+".o.o........o.o.",
+".o.o.oooooo.o.o.",
+".o.o.o....o.o.o.",
+".o.o.o.oo.o.o.o.",
+".o.o.o.oo.o.o.o.",
+".o.o.o....o.o.o.",
+".o.o.oooooo.o.o.",
+".o.o........o.o.",
+".o.oooooooooo.o.",
+".o............o.",
+".oooooooooooooo.",
+"................"
+};
