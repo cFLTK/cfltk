@@ -55,6 +55,10 @@ set(CFLTK_CORE_SOURCES
     src/text/Fl_Text_Buffer.c
     src/text/Fl_Text_Display.c
     src/text/Fl_Text_Editor.c
+    src/image/Fl_Image.c
+    src/image/Fl_RGB_Image.c
+    src/image/Fl_Pixmap.c
+    src/image/Fl_Bitmap.c
     src/menu/Fl_Menu_Item.c
     src/menu/Fl_Menu_.c
     src/menu/fl_menu_popup.c
@@ -143,4 +147,7 @@ if(CFLTK_BUILD_EXAMPLES)
 
     add_executable(text_editor examples/text_editor/text_editor.c)
     target_link_libraries(text_editor PRIVATE cfltk)
+
+    add_executable(images examples/images/images.c)
+    target_link_libraries(images PRIVATE cfltk)
 endif()

@@ -249,6 +249,14 @@ static inline void Fl_Widget_set_labelfont(Fl_Widget *self, Fl_Font f) { self->l
 static inline Fl_Fontsize Fl_Widget_labelsize(const Fl_Widget *self) { return self->label.size; }
 static inline void Fl_Widget_set_labelsize(Fl_Widget *self, Fl_Fontsize s) { self->label.size = s; }
 
+/* image()/deimage(): only pointer plumbing, so these work fine against
+ * the forward-declared (incomplete) Fl_Image type -- see Fl_Image.h for
+ * the actual struct definition and drawing dispatch. */
+static inline Fl_Image *Fl_Widget_image(const Fl_Widget *self) { return self->label.image; }
+static inline void Fl_Widget_set_image(Fl_Widget *self, Fl_Image *img) { self->label.image = img; }
+static inline Fl_Image *Fl_Widget_deimage(const Fl_Widget *self) { return self->label.deimage; }
+static inline void Fl_Widget_set_deimage(Fl_Widget *self, Fl_Image *img) { self->label.deimage = img; }
+
 static inline Fl_Align Fl_Widget_align(const Fl_Widget *self) { return self->label.align; }
 static inline void Fl_Widget_set_align(Fl_Widget *self, Fl_Align a) { self->label.align = a; }
 
@@ -380,9 +388,8 @@ void Fl_Widget_draw_label_in(const Fl_Widget *self, int x, int y, int w, int h);
 void Fl_Widget_draw_label(const Fl_Widget *self);
 
 void Fl_Widget_draw_focus(const Fl_Widget *self, uchar boxtype, int x, int y, int w, int h);
-/* No-op until Fl_Image is implemented (label.image is always NULL for
- * now) -- kept as a call site so widgets that port draw_backdrop() calls
- * verbatim don't need editing again once images land. */
+/* Draws image()/deimage() centered over the widget when
+ * FL_ALIGN_IMAGE_BACKDROP is set in align() -- see Fl_Image.h. */
 void Fl_Widget_draw_backdrop(const Fl_Widget *self);
 
 #define FL_RESERVED_TYPE 100

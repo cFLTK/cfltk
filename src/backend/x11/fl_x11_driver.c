@@ -301,6 +301,99 @@ static void d_draw_text(const char *str, int n, int x, int y) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Raw image blit/read-back                                            */
+/*                                                                      */
+/* Assumes the default visual is a standard 24/32-bit TrueColor visual */
+/* with byte order (r<<16)|(g<<8)|b -- already the assumption baked    */
+/* into apply_color()'s XSetForeground() call above, so this adds no   */
+/* new limitation. No offscreen/cached surface: every call builds a    */
+/* fresh XImage and blits it through the current target's GC (whose    */
+/* clip rectangle -- see apply_clip() -- X applies automatically to    */
+/* XPutImage, so no separate clip-box math is needed here beyond what  */
+/* Fl_RGB_Image itself does to crop the *source* array).                */
+/* ------------------------------------------------------------------ */
+
+static void d_draw_image(const unsigned char *buf, int x, int y, int w, int h, int d, int ld) {
+    XImage *img;
+    int row, col, stride;
+    unsigned char *data;
+
+    if (!fl_x11_current_target || w <= 0 || h <= 0) return;
+
+    stride = ld != 0 ? ld : w * d;
+    data = (unsigned char *)malloc((size_t)w * (size_t)h * 4);
+    if (!data) return;
+
+    img = XCreateImage(fl_x11_display, fl_x11_visual, 24, ZPixmap, 0, (char *)data, (unsigned)w, (unsigned)h, 32, 0);
+    if (!img) { free(data); return; }
+
+    for (row = 0; row < h; row++) {
+        const unsigned char *src = buf + (size_t)row * (size_t)stride;
+        for (col = 0; col < w; col++) {
+            unsigned long pixel;
+            if (d >= 3) {
+                pixel = ((unsigned long)src[0] << 16) | ((unsigned long)src[1] << 8) | (unsigned long)src[2];
+                src += d;
+            } else {
+                pixel = ((unsigned long)src[0] << 16) | ((unsigned long)src[0] << 8) | (unsigned long)src[0];
+                src += d;
+            }
+            XPutPixel(img, col, row, pixel);
+        }
+    }
+
+    XPutImage(fl_x11_display, fl_x11_current_target->xid, fl_x11_current_target->gc, img, 0, 0, x, y, (unsigned)w, (unsigned)h);
+    XDestroyImage(img); /* also frees `data` */
+}
+
+static void d_read_image(unsigned char *buf, int x, int y, int w, int h, int d) {
+    XImage *img;
+    int row, col;
+
+    if (!fl_x11_current_target || w <= 0 || h <= 0) return;
+    img = XGetImage(fl_x11_display, fl_x11_current_target->xid, x, y, (unsigned)w, (unsigned)h, AllPlanes, ZPixmap);
+    if (!img) { memset(buf, 0, (size_t)w * (size_t)h * (size_t)d); return; }
+
+    for (row = 0; row < h; row++) {
+        unsigned char *dst = buf + (size_t)row * (size_t)w * (size_t)d;
+        for (col = 0; col < w; col++) {
+            unsigned long pixel = XGetPixel(img, col, row);
+            unsigned char r = (unsigned char)((pixel >> 16) & 0xff);
+            unsigned char g = (unsigned char)((pixel >> 8) & 0xff);
+            unsigned char b = (unsigned char)(pixel & 0xff);
+            if (d >= 3) {
+                dst[0] = r; dst[1] = g; dst[2] = b;
+                dst += d;
+            } else {
+                dst[0] = (unsigned char)((r * 31 + g * 61 + b * 8) / 100);
+                dst += d;
+            }
+        }
+    }
+    XDestroyImage(img);
+}
+
+/* Fl_Bitmap: builds a throwaway 1-bit X Pixmap from the XBM-style data
+ * (no caching, see fl_draw.h's known differences) and stipple-fills
+ * the requested rectangle with it in the current foreground color. */
+static void d_draw_bitmask(const unsigned char *bits, int bmp_w, int bmp_h, int cx, int cy, int x, int y, int w, int h) {
+    Pixmap pm;
+    int ox, oy;
+
+    if (!fl_x11_current_target || w <= 0 || h <= 0) return;
+
+    pm = XCreateBitmapFromData(fl_x11_display, fl_x11_current_target->xid, (const char *)bits, (unsigned)((bmp_w + 7) & ~7), (unsigned)bmp_h);
+    if (!pm) return;
+
+    XSetStipple(fl_x11_display, fl_x11_current_target->gc, pm);
+    ox = x - cx; if (ox < 0) ox += bmp_w;
+    oy = y - cy; if (oy < 0) oy += bmp_h;
+    XSetTSOrigin(fl_x11_display, fl_x11_current_target->gc, ox, oy);
+    XSetFillStyle(fl_x11_display, fl_x11_current_target->gc, FillStippled);
+    XFillRectangle(fl_x11_display, fl_x11_current_target->xid, fl_x11_current_target->gc, x, y, (unsigned)w, (unsigned)h);
+    XSetFillStyle(fl_x11_display, fl_x11_current_target->gc, FillSolid);
+    XFreePixmap(fl_x11_display, pm);
+}
 
 static const Fl_Graphics_Driver g_driver = {
     d_color_index, d_color_rgb, d_current_color,
@@ -309,7 +402,9 @@ static const Fl_Graphics_Driver g_driver = {
     d_point, d_line, d_line3, d_xyline, d_yxline, d_rect, d_rectf,
     d_loop3, d_polygon3, d_arc, d_pie,
     d_font, d_current_font, d_current_size, d_height, d_descent, d_width,
-    d_draw_text
+    d_draw_text,
+    d_draw_image, d_read_image,
+    d_draw_bitmask
 };
 
 const Fl_Graphics_Driver *fl_x11_graphics_driver(void) { return &g_driver; }

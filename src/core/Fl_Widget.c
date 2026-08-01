@@ -10,6 +10,7 @@
 #include "cfltk/Fl_Window.h"
 #include "cfltk/Fl.h"
 #include "cfltk/fl_draw.h"
+#include "cfltk/Fl_Image.h"
 
 void Fl_Widget_init(Fl_Widget *self, const Fl_WidgetOps *ops,
                      int x, int y, int w, int h, const char *label) {
@@ -369,7 +370,11 @@ void Fl_Widget_draw_focus(const Fl_Widget *self, uchar boxtype, int x, int y, in
 }
 
 void Fl_Widget_draw_backdrop(const Fl_Widget *self) {
-    (void)self;
+    Fl_Image *img;
+    if (!(Fl_Widget_align(self) & FL_ALIGN_IMAGE_BACKDROP)) return;
+    img = Fl_Widget_image(self);
+    if (img && Fl_Widget_deimage(self) && !Fl_Widget_active_r(self)) img = Fl_Widget_deimage(self);
+    if (img) Fl_Image_draw_at(img, self->x + (self->w - Fl_Image_w(img)) / 2, self->y + (self->h - Fl_Image_h(img)) / 2);
 }
 
 Fl_Window *Fl_Widget_top_window(const Fl_Widget *self) {

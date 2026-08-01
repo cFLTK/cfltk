@@ -13,6 +13,7 @@
 
 #include "cfltk/fl_draw.h"
 #include "cfltk/fl_colormap.h"
+#include "cfltk/Fl_Image.h"
 #include "../backend/fl_backend.h"
 
 static const Fl_Graphics_Driver *g_driver = NULL;
@@ -243,9 +244,9 @@ int fl_box_is_frame(uchar boxtype) { return box_entry(boxtype)->is_frame; }
 
 /* ------------------------------------------------------------------ */
 /* Label drawing/measuring (protected Fl_Label::draw()/measure() in
- * src/Fl_Widget.cxx, reduced to the FL_NORMAL_LABEL text case -- image
- * labels and the shadow/engraved/embossed label types are follow-up
- * work, see docs/DESIGN.md). */
+ * src/Fl_Widget.cxx, reduced to the FL_NORMAL_LABEL text+image case --
+ * the shadow/engraved/embossed label types are follow-up work, see
+ * docs/DESIGN.md). */
 /* ------------------------------------------------------------------ */
 
 int fl_draw_shortcut = 0;
@@ -284,43 +285,88 @@ void fl_label_measure(const Fl_Label *label, int *w, int *h) {
     int underline;
     *w = 0;
     *h = 0;
-    if (!label->value || !label->value[0]) return;
-    fl_font(label->font, label->size);
-    strip_shortcut_marker(label->value, buf, (int)sizeof(buf), &underline);
-    *w = (int)fl_width_str(buf);
-    *h = fl_height();
+    if (label->value && label->value[0]) {
+        fl_font(label->font, label->size);
+        strip_shortcut_marker(label->value, buf, (int)sizeof(buf), &underline);
+        *w = (int)fl_width_str(buf);
+        *h = fl_height();
+    }
+    if (label->image) {
+        int iw = Fl_Image_w(label->image), ih = Fl_Image_h(label->image);
+        if (iw > *w) *w = iw;
+        *h += ih;
+    }
 }
 
+/* Combined text+image label drawing, scoped down from upstream's
+ * fl_draw(str,x,y,w,h,align,img,draw_symbols) (see docs/DESIGN.md):
+ * stacks the image above or below the text depending on
+ * FL_ALIGN_TEXT_OVER_IMAGE, or draws image-only / text-only when the
+ * other is absent -- covering the overwhelming majority of real
+ * widget labels (icon-only toolbar buttons, and text-with-icon
+ * buttons/menu items). Known differences: no FL_ALIGN_IMAGE_NEXT_TO_TEXT
+ * side-by-side layout, no '@'-prefixed inline symbol glyphs in labels
+ * (fl_draw_symbol()'s mini-language -- distinct from Fl_Browser's own
+ * '@'-format codes, which ARE ported, see docs/DESIGN.md), no
+ * multi-line wrap (pre-existing text-only limitation, unchanged). */
 void fl_label_draw(const Fl_Label *label, int x, int y, int w, int h, Fl_Align align) {
-    int lw, lh, lx, ly, underline, dn, baseline;
+    int lw = 0, lh = 0, lx = 0, ly, underline = -1, dn = 0, baseline;
+    int imgw = 0, imgh = 0, total_h, top;
     char buf[512];
+    int has_text = label->value && label->value[0] ? 1 : 0;
+    Fl_Image *img = (align & FL_ALIGN_IMAGE_BACKDROP) ? NULL : label->image;
+    int text_over_image = (align & FL_ALIGN_TEXT_OVER_IMAGE) ? 1 : 0;
 
     if (label->type == FL_NO_LABEL) return;
-    if (!label->value || !label->value[0]) return;
+    if (!has_text && !img) return;
 
     fl_font(label->font, label->size);
     fl_color(label->color);
 
-    dn = strip_shortcut_marker(label->value, buf, (int)sizeof(buf), &underline);
-    lw = (int)fl_width_str(buf);
-    lh = fl_height();
-
-    if (align & FL_ALIGN_LEFT) lx = x;
-    else if (align & FL_ALIGN_RIGHT) lx = x + w - lw;
-    else lx = x + (w - lw) / 2;
-
-    if (align & FL_ALIGN_TOP) ly = y;
-    else if (align & FL_ALIGN_BOTTOM) ly = y + h - lh;
-    else ly = y + (h - lh) / 2;
+    if (has_text) {
+        dn = strip_shortcut_marker(label->value, buf, (int)sizeof(buf), &underline);
+        lw = (int)fl_width_str(buf);
+        lh = fl_height();
+    }
+    if (img) { imgw = Fl_Image_w(img); imgh = Fl_Image_h(img); }
 
     if (align & FL_ALIGN_CLIP) fl_push_clip(x, y, w, h);
-    baseline = ly + fl_height() - fl_descent();
-    fl_draw_text(buf, dn, lx, baseline);
-    if (underline >= 0) {
-        int ux = lx + (int)fl_width(buf, underline);
-        int uw = (int)fl_width(buf + underline, 1);
-        if (uw < 1) uw = 1;
-        fl_line(ux, baseline + 2, ux + uw - 1, baseline + 2);
+
+    total_h = lh + imgh;
+    if (align & FL_ALIGN_BOTTOM) top = y + h - total_h;
+    else if (align & FL_ALIGN_TOP) top = y;
+    else top = y + (h - total_h) / 2;
+
+    if (img && !text_over_image) {
+        if (align & FL_ALIGN_LEFT) lx = x;
+        else if (align & FL_ALIGN_RIGHT) lx = x + w - imgw;
+        else lx = x + (w - imgw) / 2;
+        Fl_Image_draw_at(img, lx, top);
+        top += imgh;
     }
+
+    if (has_text) {
+        if (align & FL_ALIGN_LEFT) lx = x;
+        else if (align & FL_ALIGN_RIGHT) lx = x + w - lw;
+        else lx = x + (w - lw) / 2;
+        ly = top;
+        baseline = ly + fl_height() - fl_descent();
+        fl_draw_text(buf, dn, lx, baseline);
+        if (underline >= 0) {
+            int ux = lx + (int)fl_width(buf, underline);
+            int uw = (int)fl_width(buf + underline, 1);
+            if (uw < 1) uw = 1;
+            fl_line(ux, baseline + 2, ux + uw - 1, baseline + 2);
+        }
+        top += lh;
+    }
+
+    if (img && text_over_image) {
+        if (align & FL_ALIGN_LEFT) lx = x;
+        else if (align & FL_ALIGN_RIGHT) lx = x + w - imgw;
+        else lx = x + (w - imgw) / 2;
+        Fl_Image_draw_at(img, lx, top);
+    }
+
     if (align & FL_ALIGN_CLIP) fl_pop_clip();
 }

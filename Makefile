@@ -51,6 +51,10 @@ CORE_SRCS := \
     src/text/Fl_Text_Buffer.c \
     src/text/Fl_Text_Display.c \
     src/text/Fl_Text_Editor.c \
+    src/image/Fl_Image.c \
+    src/image/Fl_RGB_Image.c \
+    src/image/Fl_Pixmap.c \
+    src/image/Fl_Bitmap.c \
     src/menu/Fl_Menu_Item.c \
     src/menu/Fl_Menu_.c \
     src/menu/fl_menu_popup.c \
@@ -115,6 +119,7 @@ examples: $(LIB)
 	$(CC) $(CFLAGS) examples/tabs_scroll/tabs_scroll.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/tabs_scroll
 	$(CC) $(CFLAGS) examples/browser/browser.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/browser
 	$(CC) $(CFLAGS) examples/text_editor/text_editor.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/text_editor
+	$(CC) $(CFLAGS) examples/images/images.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/images
 
 clean:
 	rm -f $(OBJS) $(OBJS:.o=.d) $(LIB)

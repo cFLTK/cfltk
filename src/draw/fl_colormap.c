@@ -9,6 +9,10 @@
  * indexed and direct RGB Fl_Color values uniformly.
  */
 #include "cfltk/fl_colormap.h"
+#include <ctype.h>
+#include <stdio.h>
+#include <string.h>
+#include <strings.h>
 
 const unsigned fl_colormap[256] = {
     0x00000000, 0xff000000, 0x00ff0000, 0xffff0000,
@@ -82,4 +86,56 @@ void fl_get_color_rgb(Fl_Color c, uchar *r, uchar *g, uchar *b) {
     *r = (uchar)(packed >> 24);
     *g = (uchar)(packed >> 16);
     *b = (uchar)(packed >> 8);
+}
+
+static const struct { const char *name; uchar r, g, b; } named_colors[] = {
+    { "black", 0, 0, 0 }, { "white", 255, 255, 255 },
+    { "red", 255, 0, 0 }, { "green", 0, 255, 0 }, { "blue", 0, 0, 255 },
+    { "yellow", 255, 255, 0 }, { "cyan", 0, 255, 255 }, { "magenta", 255, 0, 255 },
+    { "gray", 190, 190, 190 }, { "grey", 190, 190, 190 },
+    { "orange", 255, 165, 0 }, { "purple", 160, 32, 240 },
+    { "brown", 165, 42, 42 }, { "pink", 255, 192, 203 }, { "navy", 0, 0, 128 },
+};
+
+int fl_parse_color(const char *name, uchar *r, uchar *g, uchar *b) {
+    const char *p = name;
+    size_t n, m, i;
+    const char *pattern;
+    int rr, gg, bb;
+
+    if (!p || !*p) return 0;
+    if (*p == '#') p++;
+
+    n = strlen(p);
+    m = n / 3;
+    if (n && n % 3 == 0 && m >= 1 && m <= 4) {
+        int all_hex = 1;
+        for (i = 0; i < n; i++) if (!isxdigit((unsigned char)p[i])) { all_hex = 0; break; }
+        if (all_hex) {
+            switch (m) {
+                case 1: pattern = "%1x%1x%1x"; break;
+                case 2: pattern = "%2x%2x%2x"; break;
+                case 3: pattern = "%3x%3x%3x"; break;
+                default: pattern = "%4x%4x%4x"; break;
+            }
+            if (sscanf(p, pattern, &rr, &gg, &bb) == 3) {
+                switch (m) {
+                    case 1: rr *= 0x11; gg *= 0x11; bb *= 0x11; break;
+                    case 3: rr >>= 4; gg >>= 4; bb >>= 4; break;
+                    case 4: rr >>= 8; gg >>= 8; bb >>= 8; break;
+                    default: break;
+                }
+                *r = (uchar)rr; *g = (uchar)gg; *b = (uchar)bb;
+                return 1;
+            }
+        }
+    }
+
+    for (i = 0; i < sizeof(named_colors) / sizeof(named_colors[0]); i++) {
+        if (strcasecmp(name, named_colors[i].name) == 0) {
+            *r = named_colors[i].r; *g = named_colors[i].g; *b = named_colors[i].b;
+            return 1;
+        }
+    }
+    return 0;
 }

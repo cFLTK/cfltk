@@ -72,6 +72,12 @@ under an isolated X11 display):
 | `Fl_Text_Buffer` (+ `Fl_Text_Selection`) | `include/cfltk/Fl_Text_Buffer.h`, `src/text/Fl_Text_Buffer.c` |
 | `Fl_Text_Display` | `include/cfltk/Fl_Text_Display.h`, `src/text/Fl_Text_Display.c` |
 | `Fl_Text_Editor` | `include/cfltk/Fl_Text_Editor.h`, `src/text/Fl_Text_Editor.c` |
+| `Fl_Image` (base) | `include/cfltk/Fl_Image.h`, `src/image/Fl_Image.c` |
+| `Fl_RGB_Image` | `include/cfltk/Fl_RGB_Image.h`, `src/image/Fl_RGB_Image.c` |
+| `Fl_Pixmap` (+ XPM parsing engine from `fl_draw_pixmap.cxx`) | `include/cfltk/Fl_Pixmap.h`, `src/image/Fl_Pixmap.c` |
+| `Fl_Bitmap` | `include/cfltk/Fl_Bitmap.h`, `src/image/Fl_Bitmap.c` |
+| Raw image blit/read-back (`fl_draw_image`/`fl_read_image`/`fl_draw_bitmask`, new `Fl_Graphics_Driver` methods) | `include/cfltk/fl_draw.h`, `src/backend/x11/fl_x11_driver.c` |
+| `fl_parse_color` (new; XPM color-table parsing) | `include/cfltk/fl_colormap.h`, `src/draw/fl_colormap.c` |
 
 ## Cross-cutting translation rules
 
@@ -438,20 +444,77 @@ under an isolated X11 display):
   Caught by interactive Xephyr testing: typing lowercase letters worked
   immediately, but capitals and shifted symbols (`*`, `/`) silently
   failed to insert until this was fixed.
+- **`Fl_Image`/`Fl_RGB_Image`/`Fl_Pixmap`/`Fl_Bitmap` have no cached
+  offscreen drawing surface.** Upstream caches a platform image handle
+  per object (`id_`/`mask_`, an `Fl_Offscreen`/server-side Pixmap built
+  lazily on first `draw()` and reused after) built on a general
+  offscreen-surface subsystem (`fl_create_offscreen`/
+  `fl_begin_offscreen`/`fl_end_offscreen`) that nothing else in cfltk
+  needs yet. Rather than build that whole subsystem prematurely (see
+  cfltk's own "don't add abstractions beyond what's needed" rule),
+  every image type here re-blits straight from its source pixel array
+  on every `draw()` call, through two new backend-neutral primitives
+  added to `Fl_Graphics_Driver` (see `fl_draw.h`): `draw_image()`/
+  `read_image()` (raw RGB(A) blit/read-back, X11 impl: fresh `XImage` +
+  `XPutImage`/`XGetImage`, no caching) and `draw_bitmask()` (1-bpp
+  stipple fill in the current color, X11 impl: fresh `XCreateBitmapFromData`
+  + `XSetStipple`/`XFillRectangle`, no caching). This is
+  correctness-identical to upstream, just without the caching
+  optimization; `uncache()` is consequently a no-op on every image
+  type. 2- and 4-channel (alpha-bearing) `Fl_RGB_Image`s and
+  `Fl_Pixmap`'s inherently-binary-alpha XPM output are composited in
+  software against `read_image()`'s screen readback -- the same
+  "manual composite, no accelerated alpha" fallback upstream's own
+  Xlib backend uses when accelerated alpha isn't available (cfltk
+  always takes that path).
+- **`fl_parse_color()` (new; needed by `Fl_Pixmap`'s XPM color-table
+  parsing) only recognizes hex color specs plus a small fixed table of
+  common X11 color names** (black/white/red/green/blue/...), not the
+  full X11 `rgb.txt` name database upstream's `XParseColor()` resolves
+  on Linux. Virtually all real-world XPM files use hex colors, so this
+  covers the common case; an unrecognized name (including XPM's own
+  "None" transparency marker) falls back to fully transparent, matching
+  upstream's own catch-all behavior for unparseable colors.
+- **No `Fl_Menu_Item` image-label support.** Upstream's
+  `Fl_Image::label(Fl_Menu_Item*)` plugs into `Fl::set_labeltype()`'s
+  pluggable labeltype-callback registry, which cfltk's menu items don't
+  have (they draw plain text labels only). Image labels on ordinary
+  `Fl_Widget`s -- the far more common case, and what toolbar/icon
+  buttons actually use -- work fully via `Fl_Widget_set_image()`.
+- **Combined text+image label drawing (`fl_label_draw()`) supports
+  vertical stacking only** (image above or below text, chosen by
+  `FL_ALIGN_TEXT_OVER_IMAGE`, or image-only/text-only when the other is
+  absent) -- covering icon-only buttons and the common
+  text-with-icon-above/below-it case. Not ported: `FL_ALIGN_IMAGE_NEXT_TO_TEXT`
+  side-by-side layout, and `@`-prefixed inline symbol glyphs in labels
+  (`fl_draw_symbol()`'s mini-language -- distinct from `Fl_Browser`'s
+  own `@`-format codes, which *are* ported).
+- **No PNG/JPEG/GIF/BMP file-format loaders yet.** `Fl_RGB_Image`,
+  `Fl_Pixmap` (XPM, in-memory `char**` data), and `Fl_Bitmap` (XBM,
+  in-memory data) are complete; decoding actual image *files* is
+  follow-up work (`Fl_PNG_Image`/`Fl_JPEG_Image` need `libpng`/`libjpeg`
+  behind a compile-time switch per the original plan; `Fl_BMP_Image`/
+  `Fl_GIF_Image` are self-contained decoders needing no external
+  library). See Next phases.
 
 ## Next phases (not started)
 
-1. `Fl_File_Browser` (needs `Fl_Image` first, for icons).
-2. `Fl_Image` + image loaders (behind a compile-time switch).
-3. The rest of the official FLTK example suite (see the contract's
+1. `Fl_BMP_Image`/`Fl_GIF_Image` (self-contained decoders, no external
+   library dependency) and `Fl_PNG_Image`/`Fl_JPEG_Image` (need
+   `libpng`/`libjpeg`, behind a compile-time switch) file-format
+   loaders on top of the now-complete `Fl_Image`/`Fl_RGB_Image` base.
+2. `Fl_Shared_Image` (the caching/reference-counted loader-dispatch
+   layer `Fl_File_Browser` needs for automatic file-icon loading).
+3. `Fl_File_Browser`.
+4. The rest of the official FLTK example suite (see the contract's
    "Required Validation Programs" list), each one both a port target
    and a regression check on the core.
-4. Automated regression tests (widget lifecycle, event propagation,
+5. Automated regression tests (widget lifecycle, event propagation,
    layout/resize, parent/child bookkeeping) — none exist yet; phase 1
    was validated by visual inspection of `examples/hello` only.
-5. Dillo integration once the widget set Dillo's `dw::fltk` needs is
+6. Dillo integration once the widget set Dillo's `dw::fltk` needs is
    covered.
-6. A NuttX/NX backend implementing the exact `src/backend/fl_backend.h`
+7. A NuttX/NX backend implementing the exact `src/backend/fl_backend.h`
    seam the X11 backend implements now.
 
 ## Reference source

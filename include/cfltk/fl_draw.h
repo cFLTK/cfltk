@@ -18,6 +18,11 @@
  *   - No matrix/transform stack (fl_push_matrix family), no complex
  *     polygons, no offscreen/print surfaces yet -- out of scope for the
  *     Linux reference backend's first pass. See docs/DESIGN.md.
+ *   - draw_image()/read_image() (added for Fl_RGB_Image) always blit
+ *     straight to the current drawable -- there is no cached/offscreen
+ *     image surface (upstream's per-image `id_`/`Fl_Offscreen` cache).
+ *     Every Fl_RGB_Image::draw() call re-blits from its source array.
+ *     See docs/DESIGN.md.
  *   - Box drawing keeps upstream's function-pointer-table design
  *     (fl_box_table[boxtype]) unchanged in spirit; see fl_draw_box().
  */
@@ -68,6 +73,35 @@ typedef struct Fl_Graphics_Driver {
     double (*width)(const char *text, int n);
 
     void (*draw_text)(const char *str, int n, int x, int y);
+
+    /* Raw pixel blit/read-back, matching upstream's free functions
+     * fl_draw_image()/fl_read_image() (themselves thin driver
+     * forwarders). buf for draw_image is row-major top-to-bottom,
+     * `d` bytes per pixel (1=gray, 3=RGB -- the only depths cfltk's
+     * Fl_RGB_Image ever hands the driver directly; 2/4-channel
+     * images with alpha are pre-composited to depth 3 by
+     * Fl_RGB_Image itself before calling fl_draw_image(), the same
+     * "manual composite, no accelerated alpha" path upstream's own
+     * Xlib backend falls back to -- see docs/DESIGN.md), `ld` is the
+     * byte stride between rows (0 means w*d). read_image fills buf
+     * (already allocated by the caller) with `d`-byte-per-pixel data
+     * (1 or 3) read back from the current drawable at (x,y,w,h); used
+     * only for software alpha compositing (see docs/DESIGN.md), not
+     * exposed as a general screenshot API yet. */
+    void (*draw_image)(const unsigned char *buf, int x, int y, int w, int h, int d, int ld);
+    void (*read_image)(unsigned char *buf, int x, int y, int w, int h, int d);
+
+    /* Draws a 1-bit-per-pixel mask (Fl_Bitmap's XBM-style data: LSB
+     * first, each row padded out to a whole byte -- (bmp_w+7)/8 bytes
+     * per row where bmp_w/bmp_h is the FULL bitmap's size) in the
+     * current color: set bits paint, clear bits are left untouched
+     * (transparent), matching upstream's XSetStipple()/FillStippled
+     * behavior. (x,y,w,h) is the on-screen rectangle to fill; (cx,cy)
+     * is the offset into the bitmap of that rectangle's top-left
+     * corner (for cropped/scrolled drawing), and bmp_w/bmp_h are the
+     * full bitmap's own dimensions (needed to compute the stipple
+     * origin/wrap). */
+    void (*draw_bitmask)(const unsigned char *bits, int bmp_w, int bmp_h, int cx, int cy, int x, int y, int w, int h);
 } Fl_Graphics_Driver;
 
 /* Installed by the platform backend before any drawing happens. */
@@ -166,6 +200,27 @@ static inline double fl_width_str(const char *txt) { return fl_width(txt, txt ? 
 static inline void fl_draw_text(const char *str, int n, int x, int y) { fl_graphics_driver()->draw_text(str, n, x, y); }
 void fl_draw(const char *str, int x, int y);
 void fl_measure(const char *str, int *w, int *h, int draw_symbols);
+
+/* ------------------------------------------------------------------ */
+/* Raw image blit/read-back (see Fl_Graphics_Driver::draw_image/       */
+/* read_image above).                                                  */
+/* ------------------------------------------------------------------ */
+
+static inline void fl_draw_image(const unsigned char *buf, int x, int y, int w, int h, int d, int ld) {
+    fl_graphics_driver()->draw_image(buf, x, y, w, h, d, ld);
+}
+/* Reads back w*h pixels of `d`-byte-per-pixel data (1 or 3) from the
+ * current drawable at (x,y) into buf, which must be at least w*h*d
+ * bytes. Unlike upstream's fl_read_image(), this never allocates --
+ * cfltk has no client that needs the allocate-if-NULL convenience yet,
+ * and the only caller so far (Fl_RGB_Image's software alpha compositor)
+ * always has a buffer ready. */
+static inline void fl_read_image(unsigned char *buf, int x, int y, int w, int h, int d) {
+    fl_graphics_driver()->read_image(buf, x, y, w, h, d);
+}
+static inline void fl_draw_bitmask(const unsigned char *bits, int bmp_w, int bmp_h, int cx, int cy, int x, int y, int w, int h) {
+    fl_graphics_driver()->draw_bitmask(bits, bmp_w, bmp_h, cx, cy, x, y, w, h);
+}
 
 /* ------------------------------------------------------------------ */
 /* Box drawing (fl_box_table[boxtype], same spirit as upstream)        */
