@@ -41,6 +41,11 @@ struct Fl_Window {
     int shown;
     Fl_Window *next_shown; /* intrusive list of currently-shown windows,
                                owned by Fl.c (Fl_context_register_window) */
+
+    /* Set by Fl_Double_Window_init(); read by the backend at
+     * fl_backend_window_create() time to decide whether to allocate an
+     * offscreen draw buffer. See Fl_Double_Window.h. */
+    int double_buffered;
 };
 
 extern const Fl_WidgetOps fl_window_ops;

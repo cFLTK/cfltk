@@ -25,6 +25,9 @@ CORE_SRCS := \
     src/core/fl_utf8.c \
     src/core/fl_filename.c \
     src/widgets/Fl_Window.c \
+    src/widgets/Fl_Double_Window.c \
+    src/widgets/Fl_Single_Window.c \
+    src/widgets/Fl_Menu_Window.c \
     src/widgets/Fl_Box.c \
     src/widgets/Fl_Button.c \
     src/widgets/Fl_Toggle_Button.c \
@@ -139,6 +142,7 @@ $(LIB): $(BUILD_DIR) $(OBJS)
 
 examples: $(LIB)
 	$(CC) $(CFLAGS) examples/hello/hello.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/hello
+	$(CC) $(CFLAGS) examples/double_window/double_window.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/double_window
 	$(CC) $(CFLAGS) examples/buttons/buttons.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/buttons
 	$(CC) $(CFLAGS) examples/radio/radio.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/radio
 	$(CC) $(CFLAGS) examples/input/input.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/input

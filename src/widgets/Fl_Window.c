@@ -50,6 +50,7 @@ void Fl_Window_init(Fl_Window *self, int x, int y, int w, int h, const char *lab
     self->backend_data = NULL;
     self->shown = 0;
     self->next_shown = NULL;
+    self->double_buffered = 0;
 
     /* Fl_Group_init() already called begin() on this window, matching
      * upstream: the constructor opens the group for adding children, but

@@ -17,7 +17,7 @@ static Fl_Window *find_window(Window xid) {
     Fl_Window *w;
     for (w = Fl_first_window(); w; w = Fl_next_window(w)) {
         Fl_X11_Window *xw = fl_x11_window_data(w);
-        if (xw && xw->xid == xid) return w;
+        if (xw && xw->real_xid == xid) return w;
     }
     return NULL;
 }

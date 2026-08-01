@@ -23,6 +23,9 @@ under an isolated X11 display):
 | `Fl_Widget` | `include/cfltk/Fl_Widget.h`, `src/core/Fl_Widget.c` |
 | `Fl_Group` | `include/cfltk/Fl_Group.h`, `src/core/Fl_Group.c` |
 | `Fl_Window` | `include/cfltk/Fl_Window.h`, `src/widgets/Fl_Window.c` |
+| `Fl_Double_Window` | `include/cfltk/Fl_Double_Window.h`, `src/widgets/Fl_Double_Window.c` (+ offscreen-buffer support in `src/backend/x11/fl_x11_window.c`) |
+| `Fl_Single_Window` | `include/cfltk/Fl_Single_Window.h`, `src/widgets/Fl_Single_Window.c` |
+| `Fl_Menu_Window` | `include/cfltk/Fl_Menu_Window.h`, `src/widgets/Fl_Menu_Window.c` |
 | `Fl_Box` | `include/cfltk/Fl_Box.h`, `src/widgets/Fl_Box.c` |
 | `Fl_Button` | `include/cfltk/Fl_Button.h`, `src/widgets/Fl_Button.c` |
 | `Fl_Toggle_Button` | `include/cfltk/Fl_Toggle_Button.h`, `src/widgets/Fl_Toggle_Button.c` |
@@ -611,6 +614,54 @@ under an isolated X11 display):
   must also OR `FL_WHEN_ENTER_KEY` into `when()` (FLTK's real, if
   confusingly-named, flag for "also fire the callback on a
   double-click"). `examples/file_browser` sets both explicitly.
+- **`Fl_Double_Window`'s offscreen buffer is a plain X `Pixmap` +
+  `XCopyArea()`, never the Xdbe (X double-buffer extension) path
+  upstream tries first.** This is upstream's own documented fallback
+  ("if not [available], it will draw the window data into an
+  off-screen pixmap, and then copy it to the on-screen window") and is
+  what actually runs on the vast majority of modern X servers anyway
+  (Xdbe support is spotty to nonexistent under most compositors), so
+  this isn't a narrowed feature so much as always taking the code path
+  upstream itself falls back to.
+- **How double-buffering was threaded through the X11 backend without
+  touching any of `fl_x11_driver.c`'s ~26 drawing call sites**: every
+  one of them already drew through `fl_x11_current_target->xid`/`->gc`/
+  `->xft_draw` exclusively (never a separate "the real window" handle).
+  `Fl_X11_Window` (`fl_x11_internal.h`) now keeps *two* identities: a
+  `real_xid`/`real_xft_draw` pair (always the actual mapped window --
+  used for map/unmap/move/resize/grab, and as the final blit
+  destination) and the original `xid`/`gc`/`xft_draw` fields, which for
+  a double-buffered window are redirected to point at an offscreen
+  `Pixmap` instead (a single shared `gc` works for both, since X11 GCs
+  are depth/visual-scoped, not tied to one specific drawable instance).
+  Every existing driver call site keeps working unmodified, because it
+  was already only ever touching the "current draw target," which now
+  simply might not be the real window. `fl_backend_window_flush()`
+  blits the offscreen buffer onto `real_xid` with one `XCopyArea()`
+  after drawing, only when double-buffered.
+- **Fixed while implementing this: `fl_x11_event.c`'s `find_window()`
+  matched incoming X events against `xw->xid`, which -- after the
+  double-buffering split above -- points at an offscreen Pixmap for a
+  double-buffered window and would never match any real event (events
+  always carry the actual window's XID).** This would have silently
+  broken all input for every `Fl_Double_Window`. Caught during review
+  while making the split (not by a failing test -- the fix landed in
+  the same change as the feature, before any interactive testing could
+  have hit it), by checking every other place `xw->xid` was read and
+  reasoning about which ones need "the current draw target" (all of
+  `fl_x11_driver.c`) versus "the real window" (this one).
+- **No `Fl_Overlay_Window`** (a specialized double-buffered window with
+  an additional transparent overlay drawing layer, historically used
+  for e.g. rubber-band selection rectangles). No established use case
+  for it yet; can be added on top of the same offscreen-buffer
+  machinery `Fl_Double_Window` now has if needed.
+- **`Fl_Menu_Window`'s hardware-overlay-plane support is a no-op**
+  (`set_overlay()`/`clear_overlay()`/`overlay()` toggle the
+  `FL_WIDGET_NO_OVERLAY` widget flag but nothing reads it). Hardware
+  overlay planes are a 1990s X11 server feature essentially
+  unavailable on any modern compositing display; upstream's own
+  overlay path already silently falls back to normal drawing when the
+  server doesn't support it, which is effectively always true today.
 
 ## Next phases (not started)
 

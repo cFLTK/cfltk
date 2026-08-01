@@ -15,9 +15,32 @@
 #include "cfltk/fl_colormap.h"
 
 typedef struct Fl_X11_Window {
+    /* Current draw target -- what every Fl_Graphics_Driver call in
+     * fl_x11_driver.c actually draws into. Equal to real_xid/
+     * real_xft_draw for an ordinary (single-buffered) window; for a
+     * double-buffered window (see Fl_Double_Window.h) these instead
+     * point at `offscreen` for the duration of drawing, and
+     * fl_backend_window_flush() blits `offscreen` onto real_xid with
+     * one XCopyArea() afterward -- eliminating the partial-redraw
+     * flicker a directly-drawn-to window shows. Every one of
+     * fl_x11_driver.c's ~26 call sites already goes through these two
+     * fields, so this needed no changes there at all. */
     Window xid;
-    GC gc;
+    GC gc; /* shared: GCs are depth/visual-scoped in X11, not tied to
+            * one specific drawable instance, so the same GC works for
+            * both real_xid and an offscreen Pixmap of matching depth. */
     XftDraw *xft_draw;
+
+    /* The actual mapped X11 window: always valid, used for map/unmap/
+     * move/resize/property calls and as the final blit destination. */
+    Window real_xid;
+    XftDraw *real_xft_draw;
+
+    /* Double-buffering (Fl_Double_Window only). offscreen==0 means
+     * single-buffered (xid==real_xid, xft_draw==real_xft_draw). */
+    Pixmap offscreen;
+    XftDraw *offscreen_xft_draw;
+    int offscreen_w, offscreen_h;
 } Fl_X11_Window;
 
 extern Display *fl_x11_display;

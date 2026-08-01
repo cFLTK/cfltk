@@ -31,6 +31,9 @@ set(CFLTK_CORE_SOURCES
     src/core/fl_utf8.c
     src/core/fl_filename.c
     src/widgets/Fl_Window.c
+    src/widgets/Fl_Double_Window.c
+    src/widgets/Fl_Single_Window.c
+    src/widgets/Fl_Menu_Window.c
     src/widgets/Fl_Box.c
     src/widgets/Fl_Button.c
     src/widgets/Fl_Toggle_Button.c
@@ -168,6 +171,9 @@ endif()
 if(CFLTK_BUILD_EXAMPLES)
     add_executable(hello examples/hello/hello.c)
     target_link_libraries(hello PRIVATE cfltk)
+
+    add_executable(double_window examples/double_window/double_window.c)
+    target_link_libraries(double_window PRIVATE cfltk)
 
     add_executable(buttons examples/buttons/buttons.c)
     target_link_libraries(buttons PRIVATE cfltk)
