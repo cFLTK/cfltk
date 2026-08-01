@@ -98,7 +98,9 @@ CORE_SRCS := \
     src/valuators/Fl_Adjuster.c \
     src/widgets/Fl_Progress.c \
     src/widgets/Fl_Spinner.c \
-    src/widgets/Fl_Clock.c
+    src/widgets/Fl_Clock.c \
+    src/widgets/Fl_File_Input.c \
+    src/widgets/Fl_Input_Choice.c
 
 X11_SRCS := \
     src/backend/x11/fl_x11_window.c \
@@ -168,6 +170,7 @@ examples: $(LIB)
 	$(CC) $(CFLAGS) examples/tooltip/tooltip.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/tooltip
 	$(CC) $(CFLAGS) examples/dialogs/dialogs.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/dialogs
 	$(CC) $(CFLAGS) examples/spinner_progress_clock/spinner_progress_clock.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/spinner_progress_clock
+	$(CC) $(CFLAGS) examples/input_choice_file/input_choice_file.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/input_choice_file
 
 clean:
 	rm -f $(OBJS) $(OBJS:.o=.d) $(LIB)

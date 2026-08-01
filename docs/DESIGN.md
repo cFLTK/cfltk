@@ -98,6 +98,8 @@ under an isolated X11 display):
 | `Fl_File_Browser` (no `Fl_File_Icon`, see Known differences) | `include/cfltk/Fl_File_Browser.h`, `src/widgets/Fl_File_Browser.c` |
 | `Fl_Tooltip` | `include/cfltk/Fl_Tooltip.h`, `src/core/Fl_Tooltip.c` |
 | `fl_ask.H` common dialogs (`fl_message`/`fl_alert`/`fl_ask`/`fl_choice`/`fl_choice_n`/`fl_input`/`fl_password`) | `include/cfltk/fl_ask.h`, `src/dialogs/fl_ask.c` |
+| `Fl_Input_Choice` | `include/cfltk/Fl_Input_Choice.h`, `src/widgets/Fl_Input_Choice.c` |
+| `Fl_File_Input` | `include/cfltk/Fl_File_Input.h`, `src/widgets/Fl_File_Input.c` |
 
 ## Cross-cutting translation rules
 
@@ -413,6 +415,29 @@ under an isolated X11 display):
   behavioral differences from upstream. `Fl_Digital_Clock` was never
   implemented upstream either ("not yet implemented", see
   `FL_DIGITAL_CLOCK` in `Fl_Clock.h`).
+- **`Fl_Input_Choice`**: `inp_`/`menu_` are heap-allocated and added as
+  ordinary children instead of embedded by value (same reasoning as
+  `Fl_Spinner.h`'s "Ownership" note). The private `InputMenuButton`
+  subclass's tiny-triangle `draw()` override lives directly in
+  `Fl_Input_Choice.c` (a private `Fl_WidgetOps` table, not exported),
+  matching upstream's own private-nested-class scoping.
+- **`Fl_File_Input`**: a direct translation of the directory-breadcrumb
+  bar and its click-to-truncate-path behavior. `Fl_Input_draw()`
+  (`Fl_Input.c`) was refactored to take the box rectangle and the text-
+  clip rectangle as two separate parameters (`Fl_Input_draw_text_region()`,
+  now exported) instead of always deriving both from the widget's own
+  bounds, specifically so `Fl_File_Input_draw()` can draw its box
+  shifted down below the breadcrumb bar while still clipping text to
+  that same shifted region -- upstream's `Fl_Input_::drawtext()` needed
+  no such split since it already took an explicit rectangle throughout.
+  No `window()->cursor(FL_CURSOR_INSERT/_DEFAULT)` hinting on
+  `FL_MOVE`/`FL_ENTER` (cfltk has no cursor-shape API yet, same
+  omission as `Fl_Tile`). `handle_button()`'s press/release visual
+  feedback uses `Fl_Widget_redraw()` (deferred to the next flush)
+  instead of upstream's synchronous mid-handler `window()->make_current();
+  draw_buttons();` -- behaviorally equivalent in cfltk's model, where
+  each dispatched event is already followed by exactly one flush
+  before the next event is read (see `Fl_wait_for()` in `Fl.c`).
 - **`Fl_Dial`'s dot/line indicator** is drawn as a plain trig-computed
   dot/needle from the hub instead of upstream's small rotated polygon
   shapes. This predates `fl_draw.h`'s push/translate/scale/rotate

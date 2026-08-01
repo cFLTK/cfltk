@@ -105,6 +105,8 @@ set(CFLTK_CORE_SOURCES
     src/widgets/Fl_Progress.c
     src/widgets/Fl_Spinner.c
     src/widgets/Fl_Clock.c
+    src/widgets/Fl_File_Input.c
+    src/widgets/Fl_Input_Choice.c
 )
 
 set(CFLTK_SOURCES ${CFLTK_CORE_SOURCES})
@@ -231,4 +233,7 @@ if(CFLTK_BUILD_EXAMPLES)
 
     add_executable(spinner_progress_clock examples/spinner_progress_clock/spinner_progress_clock.c)
     target_link_libraries(spinner_progress_clock PRIVATE cfltk)
+
+    add_executable(input_choice_file examples/input_choice_file/input_choice_file.c)
+    target_link_libraries(input_choice_file PRIVATE cfltk)
 endif()

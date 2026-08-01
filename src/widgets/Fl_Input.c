@@ -266,7 +266,14 @@ static int offset_for_x(const Fl_Input *self, int line_b, int line_e, double tar
  * Drawing
  * ------------------------------------------------------------------ */
 
-static void drawtext(Fl_Input *self, int X, int Y, int W, int H) {
+/* Draws the box at (bx,by,bw,bh) and the text clipped to (X,Y,W,H) --
+ * split into two rectangles (rather than always using the widget's own
+ * bounds for both, like upstream's Fl_Input_::drawtext()) so
+ * Fl_File_Input can reuse this to draw its box shifted down below the
+ * directory-breadcrumb bar while still clipping text to the same
+ * shifted region. Fl_Input_draw() below is the common case (both
+ * rects equal to the widget's own bounds, inset by the box). */
+void Fl_Input_draw_text_region(Fl_Input *self, int bx, int by, int bw, int bh, int X, int Y, int W, int H) {
     Fl_Widget *self_w = &self->widget;
     int height, desc;
     int selstart, selend;
@@ -324,7 +331,7 @@ static void drawtext(Fl_Input *self, int X, int Y, int W, int H) {
         }
     }
 
-    fl_draw_box(self_w->box, self_w->x, self_w->y, self_w->w, self_w->h, self_w->color);
+    fl_draw_box(self_w->box, bx, by, bw, bh, self_w->color);
     fl_push_clip(X, Y, W, H);
 
     {
@@ -391,8 +398,9 @@ void Fl_Input_draw(Fl_Widget *self_w) {
     uchar b = self_w->box;
 
     if (Fl_Input_input_type(self) == FL_HIDDEN_INPUT) return;
-    drawtext(self, self_w->x + fl_box_dx(b), self_w->y + fl_box_dy(b),
-             self_w->w - fl_box_dw(b), self_w->h - fl_box_dh(b));
+    Fl_Input_draw_text_region(self, self_w->x, self_w->y, self_w->w, self_w->h,
+                               self_w->x + fl_box_dx(b), self_w->y + fl_box_dy(b),
+                               self_w->w - fl_box_dw(b), self_w->h - fl_box_dh(b));
 }
 
 /* ---------------------------------------------------------------------

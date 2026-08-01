@@ -102,6 +102,11 @@ int Fl_Input_handle(Fl_Widget *self, int event);
 void Fl_Input_resize(Fl_Widget *self, int x, int y, int w, int h);
 void Fl_Input_destroy(Fl_Widget *self);
 
+/* Exposed for Fl_File_Input, which needs to draw the box shifted down
+ * below its directory-breadcrumb bar while still clipping text to that
+ * same shifted region -- see the comment at its definition. */
+void Fl_Input_draw_text_region(Fl_Input *self, int bx, int by, int bw, int bh, int X, int Y, int W, int H);
+
 /* -------------------------------------------------------------------
  * Value
  * ---------------------------------------------------------------- */
