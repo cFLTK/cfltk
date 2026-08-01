@@ -23,6 +23,7 @@ CORE_SRCS := \
     src/core/Fl_Group.c \
     src/core/Fl.c \
     src/core/Fl_Tooltip.c \
+    src/core/Fl_Preferences.c \
     src/core/fl_utf8.c \
     src/core/fl_filename.c \
     src/widgets/Fl_Window.c \
@@ -174,6 +175,7 @@ examples: $(LIB)
 	$(CC) $(CFLAGS) examples/spinner_progress_clock/spinner_progress_clock.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/spinner_progress_clock
 	$(CC) $(CFLAGS) examples/input_choice_file/input_choice_file.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/input_choice_file
 	$(CC) $(CFLAGS) examples/xpm_xbm/xpm_xbm.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/xpm_xbm
+	$(CC) $(CFLAGS) examples/preferences/preferences.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/preferences
 
 clean:
 	rm -f $(OBJS) $(OBJS:.o=.d) $(LIB)

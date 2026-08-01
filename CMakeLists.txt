@@ -29,6 +29,7 @@ set(CFLTK_CORE_SOURCES
     src/core/Fl_Group.c
     src/core/Fl.c
     src/core/Fl_Tooltip.c
+    src/core/Fl_Preferences.c
     src/core/fl_utf8.c
     src/core/fl_filename.c
     src/widgets/Fl_Window.c
@@ -241,4 +242,7 @@ if(CFLTK_BUILD_EXAMPLES)
 
     add_executable(xpm_xbm examples/xpm_xbm/xpm_xbm.c)
     target_link_libraries(xpm_xbm PRIVATE cfltk)
+
+    add_executable(preferences examples/preferences/preferences.c)
+    target_link_libraries(preferences PRIVATE cfltk)
 endif()
