@@ -292,7 +292,12 @@ static void draw_level(const MenuLevel *lv) {
 
 static void popup_draw(Fl_Widget *self_w) {
     int i;
-    fl_draw_box(FL_FLAT_BOX, self_w->x, self_w->y, self_w->w, self_w->h, style_bgcolor());
+    /* self_w->x/y is this (top-level) window's screen position, not a
+     * local drawable offset -- see Fl_Group_draw_children() in
+     * Fl_Group.c for the general form of this fix. Was previously
+     * masked here because draw_level() below always repaints the same
+     * area using correctly window-relative coordinates. */
+    fl_draw_box(FL_FLAT_BOX, 0, 0, self_w->w, self_w->h, style_bgcolor());
     for (i = 0; i < g_menu.nlevels; i++) draw_level(&g_menu.levels[i]);
 }
 

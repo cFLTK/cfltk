@@ -275,6 +275,10 @@ static inline void Fl_Widget_set_colors(Fl_Widget *self, Fl_Color bg, Fl_Color s
 
 static inline const char *Fl_Widget_tooltip(const Fl_Widget *self) { return self->tooltip; }
 void Fl_Widget_set_tooltip(Fl_Widget *self, const char *text);
+/* Like Fl_Widget_set_tooltip(), but copies `text` (freed automatically
+ * on the next call or on widget destruction) instead of storing the
+ * pointer as-is -- matches upstream's Fl_Widget::copy_tooltip(). */
+void Fl_Widget_copy_tooltip(Fl_Widget *self, const char *text);
 
 /* -------------------------------------------------------------------
  * Callbacks.

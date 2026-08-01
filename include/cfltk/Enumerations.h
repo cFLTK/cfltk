@@ -263,6 +263,11 @@ static inline Fl_Color fl_rgb_color(uchar r, uchar g, uchar b) {
 /** Index (0..FL_NUM_GRAY-1) into the reserved gray ramp; matches upstream's public fl_gray_ramp(int). */
 static inline Fl_Color fl_gray_ramp(int i) { return (Fl_Color)(i + FL_GRAY_RAMP); }
 
+/** Index into the reserved 5x8x5 color cube (r in 0..FL_NUM_RED-1, etc.); matches upstream's public fl_color_cube(int,int,int). */
+static inline Fl_Color fl_color_cube(int r, int g, int b) {
+    return (Fl_Color)((b * FL_NUM_RED + r) * FL_NUM_GREEN + g + FL_COLOR_CUBE);
+}
+
 static inline Fl_Color fl_gray_color(uchar g) {
     if (!g) return FL_BLACK;
     if (g == 0xff) return FL_WHITE;

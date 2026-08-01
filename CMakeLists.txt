@@ -28,6 +28,7 @@ set(CFLTK_CORE_SOURCES
     src/core/Fl_Widget.c
     src/core/Fl_Group.c
     src/core/Fl.c
+    src/core/Fl_Tooltip.c
     src/core/fl_utf8.c
     src/core/fl_filename.c
     src/widgets/Fl_Window.c
@@ -217,4 +218,7 @@ if(CFLTK_BUILD_EXAMPLES)
 
     add_executable(shared_image examples/shared_image/shared_image.c)
     target_link_libraries(shared_image PRIVATE cfltk)
+
+    add_executable(tooltip examples/tooltip/tooltip.c)
+    target_link_libraries(tooltip PRIVATE cfltk)
 endif()

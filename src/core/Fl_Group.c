@@ -293,10 +293,24 @@ void Fl_Group_draw_outside_label(const Fl_Widget *w) {
 void Fl_Group_draw_children(Fl_Group *self) {
     int i;
     Fl_Widget *self_w = &self->widget;
+    /* A window's own x()/y() are its screen position (used to place its
+     * native X window), not an offset within its own drawable -- unlike
+     * every other widget, whose x()/y() are already local to the
+     * drawable they're painted into. Drawing this group's own box at
+     * (self_w->x, self_w->y) is only correct when self_w is a
+     * non-window child of some other group; for a widget that is
+     * itself a window (top-level or, if ever supported, a native
+     * subwindow), the box must be drawn at its own local origin (0,0)
+     * instead. Missing this shifted+clipped every non-(0,0)-positioned
+     * window's own background (found while implementing Fl_Tooltip's
+     * popup window, which is never at (0,0)); see docs/DESIGN.md. */
+    int is_window = Fl_Widget_as_window(self_w) != NULL;
+    int bx = is_window ? 0 : self_w->x;
+    int by = is_window ? 0 : self_w->y;
 
     if (Fl_Widget_damage(self_w) & FL_DAMAGE_ALL) {
         if (Fl_Widget_box(self_w) != FL_NO_BOX || self_w->parent == NULL)
-            fl_draw_box(Fl_Widget_box(self_w), self_w->x, self_w->y, self_w->w, self_w->h, Fl_Widget_color(self_w));
+            fl_draw_box(Fl_Widget_box(self_w), bx, by, self_w->w, self_w->h, Fl_Widget_color(self_w));
         for (i = 0; i < self->children_count; i++) {
             Fl_Widget *w = self->children_array[i];
             Fl_Group_draw_outside_label(w);

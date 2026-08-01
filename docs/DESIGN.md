@@ -93,6 +93,7 @@ under an isolated X11 display):
 | `Fl_Shared_Image` (+ `fl_register_images`/`fl_check_images` from `fl_images_core.cxx`) | `include/cfltk/Fl_Shared_Image.h`, `src/image/Fl_Shared_Image.c` |
 | Directory-listing utilities (new; `fl_filename_list`/`fl_numericsort`/`fl_filename_match`/`fl_filename_isdir`, collected from several small upstream files) | `include/cfltk/fl_filename.h`, `src/core/fl_filename.c` |
 | `Fl_File_Browser` (no `Fl_File_Icon`, see Known differences) | `include/cfltk/Fl_File_Browser.h`, `src/widgets/Fl_File_Browser.c` |
+| `Fl_Tooltip` | `include/cfltk/Fl_Tooltip.h`, `src/core/Fl_Tooltip.c` |
 
 ## Cross-cutting translation rules
 
@@ -296,15 +297,39 @@ under an isolated X11 display):
   difference, noted here only because it's the single most intricate
   piece of arithmetic ported so far and worth double-checking against
   `src/Fl_Group.cxx` if resize bugs show up.
+- **Bug fix: a window's own background box was drawn at its screen
+  position instead of its local origin.** `Fl_Group_draw_children()`
+  (`Fl_Group.c`) draws its own box at `(self_w->x, self_w->y)`, which is
+  correct for a non-window widget (whose `x()`/`y()` are already local
+  to the drawable it's painted into) but was also being used, unfixed,
+  for widgets that are themselves windows -- whose `x()`/`y()` are their
+  *screen* position (used to place the native X window), not an offset
+  within their own drawable. Any top-level window not created at
+  `(0,0)` had its background box drawn shifted by its own screen
+  position and clipped at the drawable's edges (child widgets were
+  unaffected, since their coordinates are already window-local).
+  Reproduced and confirmed fixed via a throwaway window at `(150,100)`
+  before/after screenshots. Found while implementing `Fl_Tooltip`'s
+  popup window, which is never at `(0,0)`; also fixed the same latent
+  (previously masked) instance in `fl_menu_popup.c`'s `popup_draw()`.
+- **`Fl_Tooltip`**: no automatic word-wrap to `wrap_width()` -- a
+  tooltip line wider than `wrap_width()` is capped/clipped rather than
+  reflowed onto more lines; explicit `'\n'` still starts a new line.
+  `enabled()`/`enable()` use their own dedicated static flag rather than
+  a general `Fl::option()` mechanism, matching how `Fl_visible_focus()`/
+  `Fl_scrollbar_size()` already do this in `Fl.h`. The popup window
+  reuses the same border-0/override-redirect trick as the menu popup
+  engine (`fl_menu_popup.c`) instead of a real `Fl_Menu_Window`.
 - **`Fl_Dial`'s dot/line indicator** is drawn as a plain trig-computed
   dot/needle from the hub instead of upstream's small rotated polygon
-  shapes, which rely on a push/translate/scale/rotate transform matrix
-  stack cfltk's drawing API doesn't have. The value↔angle mapping and
-  drag interaction are translated exactly (verified by tracing
-  upstream's `atan2(-my,mx)` mouse-handling formula for the cardinal
-  directions); only the indicator's pixel art differs. `FL_FILL_DIAL`
-  (the pie meter) has no such difference — it's a near-direct
-  translation using `fl_pie()`, which cfltk already has.
+  shapes. This predates `fl_draw.h`'s push/translate/scale/rotate
+  transform matrix stack (added for `fl_draw_symbol()`, see above) --
+  `Fl_Dial` hasn't been revisited to use it since. The value↔angle
+  mapping and drag interaction are translated exactly (verified by
+  tracing upstream's `atan2(-my,mx)` mouse-handling formula for the
+  cardinal directions); only the indicator's pixel art differs.
+  `FL_FILL_DIAL` (the pie meter) has no such difference — it's a
+  near-direct translation using `fl_pie()`, which cfltk already has.
 - **`Fl_Counter`'s step-button arrows** are drawn as plain triangles via
   `fl_polygon3()` instead of upstream's `"@-4<"`/`"@-4>"` `fl_draw_symbol()`
   glyphs — cfltk hasn't ported the `'@'`-string symbol mini-language

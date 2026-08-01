@@ -22,6 +22,7 @@ CORE_SRCS := \
     src/core/Fl_Widget.c \
     src/core/Fl_Group.c \
     src/core/Fl.c \
+    src/core/Fl_Tooltip.c \
     src/core/fl_utf8.c \
     src/core/fl_filename.c \
     src/widgets/Fl_Window.c \
@@ -160,6 +161,7 @@ examples: $(LIB)
 	$(CC) $(CFLAGS) examples/images/images.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/images
 	$(CC) $(CFLAGS) $(IMG_CFLAGS) examples/loaders/loaders.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) $(IMG_LIBS) -o $(BUILD_DIR)/loaders
 	$(CC) $(CFLAGS) $(IMG_CFLAGS) examples/shared_image/shared_image.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) $(IMG_LIBS) -o $(BUILD_DIR)/shared_image
+	$(CC) $(CFLAGS) examples/tooltip/tooltip.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/tooltip
 
 clean:
 	rm -f $(OBJS) $(OBJS:.o=.d) $(LIB)

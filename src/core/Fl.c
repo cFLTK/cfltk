@@ -15,6 +15,7 @@
 
 #include "cfltk/Fl.h"
 #include "cfltk/Fl_Window.h"
+#include "cfltk/Fl_Tooltip.h"
 #include "cfltk/fl_draw.h"
 #include "../backend/fl_backend.h"
 
@@ -297,6 +298,12 @@ void Fl_set_belowmouse(Fl_Widget *o) {
     for (; p && !Fl_Widget_contains(p, o); p = Fl_Widget_parent(p) ? &Fl_Widget_parent(p)->widget : NULL) {
         Fl_Widget_handle(p, FL_LEAVE);
     }
+    /* Upstream calls Fl_Tooltip::enter(belowmouse()) at every one of its
+     * own FL_MOVE/FL_DRAG/FL_ENTER call sites, each guarded by "did
+     * belowmouse() actually change" -- since this setter already only
+     * runs its body when it did (the early return above), hooking here
+     * once covers all of those call sites centrally. */
+    Fl_Tooltip_enter(o);
 }
 
 /* -------------------------------------------------------------------
@@ -309,6 +316,7 @@ void Fl_context_widget_deleted(Fl_Widget *self) {
     if (g_ctx.focus == self) g_ctx.focus = NULL;
     if (g_ctx.pushed == self) g_ctx.pushed = NULL;
     if (g_ctx.belowmouse == self) g_ctx.belowmouse = NULL;
+    Fl_Tooltip_widget_deleted(self);
 
     for (t = g_ctx.trackers; t; t = t->next) {
         if (t->widget == self) t->widget = NULL;
@@ -415,6 +423,7 @@ int Fl_context_handle(int event, Fl_Window *window) {
 
         case FL_PUSH:
             Fl_set_pushed(wi);
+            Fl_Tooltip_set_current(wi);
             return Fl_Widget_handle(wi, event);
 
         case FL_MOVE:
@@ -433,6 +442,7 @@ int Fl_context_handle(int event, Fl_Window *window) {
         case FL_KEYDOWN:
         case FL_KEYUP: {
             Fl_Widget *focus_w = g_ctx.focus;
+            if (event == FL_KEYDOWN) Fl_Tooltip_enter(NULL);
             if (focus_w && Fl_Widget_handle(focus_w, event)) return 1;
             if (event == FL_KEYDOWN) return Fl_Widget_handle(wi, FL_SHORTCUT);
             return 0;

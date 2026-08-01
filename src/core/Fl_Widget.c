@@ -190,6 +190,20 @@ void Fl_Widget_set_tooltip(Fl_Widget *self, const char *text) {
     self->tooltip = text;
 }
 
+void Fl_Widget_copy_tooltip(Fl_Widget *self, const char *text) {
+    if (self->flags & FL_WIDGET_COPIED_TOOLTIP) free((void *)self->tooltip);
+    if (text) {
+        size_t n = strlen(text) + 1;
+        char *copy = (char *)malloc(n);
+        memcpy(copy, text, n);
+        self->tooltip = copy;
+        self->flags |= FL_WIDGET_COPIED_TOOLTIP;
+    } else {
+        self->tooltip = NULL;
+        self->flags &= ~(unsigned)FL_WIDGET_COPIED_TOOLTIP;
+    }
+}
+
 void Fl_Widget_do_callback(Fl_Widget *self) {
     Fl_Widget_do_callback_for(self, self, self->user_data);
 }
