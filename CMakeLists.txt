@@ -110,6 +110,7 @@ set(CFLTK_CORE_SOURCES
     src/widgets/Fl_Clock.c
     src/widgets/Fl_File_Input.c
     src/widgets/Fl_Input_Choice.c
+    src/widgets/Fl_Color_Chooser.c
 )
 
 set(CFLTK_SOURCES ${CFLTK_CORE_SOURCES})
@@ -245,4 +246,7 @@ if(CFLTK_BUILD_EXAMPLES)
 
     add_executable(preferences examples/preferences/preferences.c)
     target_link_libraries(preferences PRIVATE cfltk)
+
+    add_executable(color_chooser examples/color_chooser/color_chooser.c)
+    target_link_libraries(color_chooser PRIVATE cfltk)
 endif()

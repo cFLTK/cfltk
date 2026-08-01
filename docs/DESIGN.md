@@ -68,6 +68,7 @@ under an isolated X11 display):
 | `Fl_Value_Output` | `include/cfltk/Fl_Value_Output.h`, `src/valuators/Fl_Value_Output.c` |
 | `Fl_Adjuster` | `include/cfltk/Fl_Adjuster.h`, `src/valuators/Fl_Adjuster.c` |
 | `Fl_Preferences` (persistent settings store) | `include/cfltk/Fl_Preferences.h`, `src/core/Fl_Preferences.c` |
+| `Fl_Color_Chooser` (+ `fl_color_chooser()` popup dialog) | `include/cfltk/Fl_Color_Chooser.h`, `src/widgets/Fl_Color_Chooser.c` |
 | `Fl_Progress` | `include/cfltk/Fl_Progress.h`, `src/widgets/Fl_Progress.c` |
 | `Fl_Spinner` | `include/cfltk/Fl_Spinner.h`, `src/widgets/Fl_Spinner.c` |
 | `Fl_Clock_Output`/`Fl_Clock`/`Fl_Round_Clock` | `include/cfltk/Fl_Clock.h`, `src/widgets/Fl_Clock.c` |
