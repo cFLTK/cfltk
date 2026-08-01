@@ -67,6 +67,7 @@ under an isolated X11 display):
 | `Fl_Browser_` | `include/cfltk/Fl_Browser_.h`, `src/widgets/Fl_Browser_.c` |
 | `Fl_Browser` | `include/cfltk/Fl_Browser.h`, `src/widgets/Fl_Browser.c` |
 | `Fl_Select_Browser` / `Fl_Hold_Browser` / `Fl_Multi_Browser` | `include/cfltk/Fl_{Select,Hold,Multi}_Browser.h`, `src/widgets/Fl_{Select,Hold,Multi}_Browser.c` |
+| `Fl_Check_Browser` | `include/cfltk/Fl_Check_Browser.h`, `src/widgets/Fl_Check_Browser.c` |
 
 ## Cross-cutting translation rules
 
@@ -325,7 +326,7 @@ under an isolated X11 display):
   axes of virtual behavior (how it draws/handles as a *widget*, shared
   by every concrete browser and implemented once in `Fl_Browser_.c`;
   and how its *items* are stored/measured/drawn, which is what
-  `Fl_Browser` -- and any future `Fl_Check_Browser`/`Fl_File_Browser` --
+  `Fl_Browser`, `Fl_Check_Browser`, and any future `Fl_File_Browser` --
   actually varies). Optional item-ops entries left NULL fall back to
   the same default behavior the corresponding upstream virtual's
   default body provides. See `Fl_Browser_.h`.
@@ -340,6 +341,18 @@ under an isolated X11 display):
   which cfltk already has, unlike the separate `fl_draw_symbol()`
   '@'-glyph language used for e.g. `Fl_Counter`'s arrows, which is not
   ported.
+- **`Fl_Check_Browser`'s checkbox outline uses `fl_rect()`** in place of
+  upstream's `fl_loop(x,y, x,y2, x2,y2, x2,y)` (a general unfilled
+  closed-polygon primitive cfltk doesn't have) -- the four points form a
+  plain axis-aligned square in this one call site, so `fl_rect()`
+  produces the identical outline. Every other line is a direct port,
+  including the quirky-but-intentional detail that a line's
+  `selected()` state (the normal browser highlight bar) is never
+  actually set true by this class -- clicking a line only toggles its
+  checkbox, it never shows a selection bar, matching upstream exactly
+  (see the header's class-conversion note for how that falls out of
+  `item_select()`'s "no-op on val==0" trick combined with `deselect()`
+  always being called first on push).
 - **`Fl_Browser::load(filename)` is not ported** -- a thin wrapper over
   `fopen()`/`fgets()`/`add()` a caller can trivially write against the
   public `add()` API; no client needs it yet.
@@ -367,8 +380,8 @@ under an isolated X11 display):
 
 ## Next phases (not started)
 
-1. More widgets: `Fl_Check_Browser`, `Fl_File_Browser` (needs `Fl_Image`
-   first, for icons), `Fl_Text_Buffer`/`Fl_Text_Editor`.
+1. More widgets: `Fl_File_Browser` (needs `Fl_Image` first, for icons),
+   `Fl_Text_Buffer`/`Fl_Text_Editor`.
 2. `Fl_Image` + image loaders (behind a compile-time switch).
 3. The rest of the official FLTK example suite (see the contract's
    "Required Validation Programs" list), each one both a port target

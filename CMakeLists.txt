@@ -50,6 +50,7 @@ set(CFLTK_CORE_SOURCES
     src/widgets/Fl_Select_Browser.c
     src/widgets/Fl_Hold_Browser.c
     src/widgets/Fl_Multi_Browser.c
+    src/widgets/Fl_Check_Browser.c
     src/menu/Fl_Menu_Item.c
     src/menu/Fl_Menu_.c
     src/menu/fl_menu_popup.c
