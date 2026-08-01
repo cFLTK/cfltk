@@ -104,6 +104,8 @@ under an isolated X11 display):
 | `fl_ask.H` common dialogs (`fl_message`/`fl_alert`/`fl_ask`/`fl_choice`/`fl_choice_n`/`fl_input`/`fl_password`) | `include/cfltk/fl_ask.h`, `src/dialogs/fl_ask.c` |
 | `Fl_Input_Choice` | `include/cfltk/Fl_Input_Choice.h`, `src/widgets/Fl_Input_Choice.c` |
 | `Fl_File_Input` | `include/cfltk/Fl_File_Input.h`, `src/widgets/Fl_File_Input.c` |
+| `Fl_Help_View` (HTML subset only: no tables, no inline images, no text selection, see Known differences) | `include/cfltk/Fl_Help_View.h`, `src/widgets/Fl_Help_View.c` |
+| `Fl_Help_Dialog` | `include/cfltk/Fl_Help_Dialog.h`, `src/dialogs/Fl_Help_Dialog.c` |
 
 ## Cross-cutting translation rules
 

@@ -111,6 +111,8 @@ set(CFLTK_CORE_SOURCES
     src/widgets/Fl_File_Input.c
     src/widgets/Fl_Input_Choice.c
     src/widgets/Fl_Color_Chooser.c
+    src/widgets/Fl_Help_View.c
+    src/dialogs/Fl_Help_Dialog.c
 )
 
 set(CFLTK_SOURCES ${CFLTK_CORE_SOURCES})
@@ -249,4 +251,7 @@ if(CFLTK_BUILD_EXAMPLES)
 
     add_executable(color_chooser examples/color_chooser/color_chooser.c)
     target_link_libraries(color_chooser PRIVATE cfltk)
+
+    add_executable(help_view examples/help_view/help_view.c)
+    target_link_libraries(help_view PRIVATE cfltk)
 endif()

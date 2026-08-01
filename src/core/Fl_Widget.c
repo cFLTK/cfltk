@@ -209,7 +209,13 @@ void Fl_Widget_do_callback(Fl_Widget *self) {
 }
 
 void Fl_Widget_do_callback_for(Fl_Widget *self, Fl_Widget *target, void *arg) {
-    if (self->callback) self->callback(target, arg);
+    Fl_Widget_Tracker wp;
+    if (!self->callback) return;
+    Fl_Widget_Tracker_watch(&wp, self);
+    self->callback(target, arg);
+    if (!Fl_Widget_Tracker_exists(&wp)) { Fl_Widget_Tracker_release(&wp); return; }
+    Fl_Widget_Tracker_release(&wp);
+    if (self->callback != Fl_Widget_default_callback) Fl_Widget_clear_changed(self);
 }
 
 void Fl_Widget_default_callback(Fl_Widget *widget, void *data) {

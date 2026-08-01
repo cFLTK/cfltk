@@ -104,7 +104,9 @@ CORE_SRCS := \
     src/widgets/Fl_Clock.c \
     src/widgets/Fl_File_Input.c \
     src/widgets/Fl_Input_Choice.c \
-    src/widgets/Fl_Color_Chooser.c
+    src/widgets/Fl_Color_Chooser.c \
+    src/widgets/Fl_Help_View.c \
+    src/dialogs/Fl_Help_Dialog.c
 
 X11_SRCS := \
     src/backend/x11/fl_x11_window.c \
@@ -178,6 +180,7 @@ examples: $(LIB)
 	$(CC) $(CFLAGS) examples/xpm_xbm/xpm_xbm.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/xpm_xbm
 	$(CC) $(CFLAGS) examples/preferences/preferences.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/preferences
 	$(CC) $(CFLAGS) examples/color_chooser/color_chooser.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/color_chooser
+	$(CC) $(CFLAGS) examples/help_view/help_view.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/help_view
 
 clean:
 	rm -f $(OBJS) $(OBJS:.o=.d) $(LIB)
