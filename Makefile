@@ -22,6 +22,7 @@ CORE_SRCS := \
     src/core/Fl_Widget.c \
     src/core/Fl_Group.c \
     src/core/Fl.c \
+    src/core/fl_utf8.c \
     src/widgets/Fl_Window.c \
     src/widgets/Fl_Box.c \
     src/widgets/Fl_Button.c \
@@ -47,6 +48,9 @@ CORE_SRCS := \
     src/widgets/Fl_Hold_Browser.c \
     src/widgets/Fl_Multi_Browser.c \
     src/widgets/Fl_Check_Browser.c \
+    src/text/Fl_Text_Buffer.c \
+    src/text/Fl_Text_Display.c \
+    src/text/Fl_Text_Editor.c \
     src/menu/Fl_Menu_Item.c \
     src/menu/Fl_Menu_.c \
     src/menu/fl_menu_popup.c \
@@ -110,6 +114,7 @@ examples: $(LIB)
 	$(CC) $(CFLAGS) examples/valuators/valuators.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/valuators
 	$(CC) $(CFLAGS) examples/tabs_scroll/tabs_scroll.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/tabs_scroll
 	$(CC) $(CFLAGS) examples/browser/browser.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/browser
+	$(CC) $(CFLAGS) examples/text_editor/text_editor.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/text_editor
 
 clean:
 	rm -f $(OBJS) $(OBJS:.o=.d) $(LIB)

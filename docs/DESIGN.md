@@ -68,6 +68,10 @@ under an isolated X11 display):
 | `Fl_Browser` | `include/cfltk/Fl_Browser.h`, `src/widgets/Fl_Browser.c` |
 | `Fl_Select_Browser` / `Fl_Hold_Browser` / `Fl_Multi_Browser` | `include/cfltk/Fl_{Select,Hold,Multi}_Browser.h`, `src/widgets/Fl_{Select,Hold,Multi}_Browser.c` |
 | `Fl_Check_Browser` | `include/cfltk/Fl_Check_Browser.h`, `src/widgets/Fl_Check_Browser.c` |
+| UTF-8 primitives (new infrastructure, not an upstream header) | `include/cfltk/fl_utf8.h`, `src/core/fl_utf8.c` |
+| `Fl_Text_Buffer` (+ `Fl_Text_Selection`) | `include/cfltk/Fl_Text_Buffer.h`, `src/text/Fl_Text_Buffer.c` |
+| `Fl_Text_Display` | `include/cfltk/Fl_Text_Display.h`, `src/text/Fl_Text_Display.c` |
+| `Fl_Text_Editor` | `include/cfltk/Fl_Text_Editor.h`, `src/text/Fl_Text_Editor.c` |
 
 ## Cross-cutting translation rules
 
@@ -377,11 +381,67 @@ under an isolated X11 display):
   `Fl_Roller`) manually decomposes it into two or three single-segment
   calls. Watch for this when porting any new upstream file that draws
   multi-segment outlines this way.
+- **New UTF-8 infrastructure (`fl_utf8.h`/`fl_utf8.c`)** was added
+  specifically for `Fl_Text_Buffer`, whose position/indexing model is
+  UTF-8-native by design (`char_at()` decodes a codepoint,
+  `next_char()`/`prev_char()` step by codepoint not byte). Nothing
+  before this needed it -- every other cfltk widget so far treats text
+  as opaque bytes. Scope is deliberately narrow: byte-level decode/
+  encode/sequence-length (`fl_utf8decode`/`fl_utf8encode`/`fl_utf8len1`,
+  ported from `src/fl_utf8.cxx`'s `ERRORS_TO_CP1252` default behavior)
+  plus ASCII-only `fl_tolower`/`fl_toupper` for case-insensitive search
+  -- full Unicode case-folding would require porting a large per-script
+  table upstream itself generates from `XUtf8Tolower()`, out of
+  proportion to what any current client needs.
+- **`Fl_Text_Buffer`'s undo is a single global slot, not a per-buffer
+  stack** -- this is upstream's own actual design (file-static
+  `undobuffer`/`undowidget`/etc. in `Fl_Text_Buffer.cxx`, shared by
+  whichever buffer was modified most recently), ported verbatim
+  including the surprising cross-buffer-invalidation behavior it
+  implies (undoing in buffer B after editing buffer A does nothing
+  useful once A's edit has overwritten the slot). Not a cfltk
+  simplification -- a faithful port of a real upstream quirk.
+- **`Fl_Text_Buffer::insertfile()`/`outputfile()` and loadfile
+  derivatives are not ported** -- thin `fopen`/`fread`/`fwrite`
+  wrappers a caller can write against the public `insert()`/`text()`
+  API; no client needs them yet.
+- **`Fl_Text_Display`/`Fl_Text_Editor` known differences** (see the
+  header comments in `Fl_Text_Display.h`/`Fl_Text_Editor.h` for full
+  detail): no drag-and-drop (the `DRAG_START_DND` path and `FL_DND_*`
+  event cases are dropped -- cfltk has no DND on any backend); no
+  custom mouse cursor shapes over the text area (cfltk's `Fl_Window`
+  has no cursor-shape API yet); no printing-surface awareness; no
+  system beep. `Fl_Text_Display`'s two scrollbars are real
+  heap-allocated `Fl_Scrollbar*` children (`Fl_Scrollbar_new()`,
+  auto-added like any other widget) rather than the embedded-struct
+  pattern used for `Fl_Scroll`/`Fl_Browser_`'s scrollbars -- upstream's
+  own `Fl_Text_Display` genuinely allocates them with `new` too, so
+  there's no destroy-ordering kludge to replicate here.
+- **Fixed while building `Fl_Text_Editor`: dropping `Fl::compose()`
+  entirely broke typing any Shift-produced character.** Upstream's
+  `handle_key()` checks `Fl::compose()` *first*, before ever consulting
+  the key-binding table; for ordinary printable text (including
+  Shift-produced capitals and symbols) it short-circuits straight to
+  inserting `Fl::event_text()`. The separate `kf_default()`/
+  `default_key_function_` fallback path -- which an early draft
+  wrongly treated as the *only* text-insertion mechanism -- is gated by
+  `if (default_key_function_ && !state)`, so it never fires when Shift
+  is held; it exists to catch unmodified control-ish keys like Tab, not
+  to be the general typing path. The fix ports `Fl::compose()`'s actual
+  non-Apple classification logic (`text_key_state()` in
+  `Fl_Text_Editor.c`: true for plain printable/high-bit text, false for
+  control characters and for Alt/Meta/Ctrl-modified non-high-bit keys)
+  ahead of the key-binding dispatch. What's genuinely not ported is
+  only the persistent XIM dead-key/CJK composition state machine
+  (`Fl::compose_state`, marked-text underlining) -- true multi-keystroke
+  IME composition -- since cfltk has no XIM/IME layer on any backend.
+  Caught by interactive Xephyr testing: typing lowercase letters worked
+  immediately, but capitals and shifted symbols (`*`, `/`) silently
+  failed to insert until this was fixed.
 
 ## Next phases (not started)
 
-1. More widgets: `Fl_File_Browser` (needs `Fl_Image` first, for icons),
-   `Fl_Text_Buffer`/`Fl_Text_Editor`.
+1. `Fl_File_Browser` (needs `Fl_Image` first, for icons).
 2. `Fl_Image` + image loaders (behind a compile-time switch).
 3. The rest of the official FLTK example suite (see the contract's
    "Required Validation Programs" list), each one both a port target

@@ -1,0 +1,57 @@
+/*
+ * cfltk - fl_utf8.h
+ *
+ * C translation of FLTK 1.3 FL/fl_utf8.h -- new infrastructure, not a
+ * translation of an existing cfltk header. Fl_Text_Buffer's data model
+ * is UTF-8 native by design (every position is a byte offset that must
+ * land on a character boundary; char_at() returns a decoded UCS-4
+ * codepoint), so implementing it faithfully requires real UTF-8
+ * decode/encode, not the ASCII-only treatment cfltk uses elsewhere
+ * (Fl_Widget shortcuts, Fl_Input, event text -- see docs/DESIGN.md).
+ *
+ * Scope is deliberately narrow: byte-level UTF-8 correctness (decode/
+ * encode/sequence-length), which is what Fl_Text_Buffer's position
+ * bookkeeping actually depends on. fl_tolower()/fl_toupper() only
+ * case-fold ASCII -- full Unicode case folding needs a large per-script
+ * table (upstream's XUtf8Tolower()) this port does not carry; matches
+ * the project's existing "ASCII-only" precedent for case-insensitive
+ * operations. This only affects case-insensitive search matching
+ * non-ASCII letters.
+ *
+ * Known differences: no fl_utf8toUtf16()/fl_utf8fromUtf16() (Windows-only
+ * upstream, irrelevant to the X11/NuttX targets this port cares about),
+ * no fl_utf8fwd()/fl_utf8back() (not needed by anything ported so far).
+ */
+#ifndef CFLTK_FL_UTF8_H
+#define CFLTK_FL_UTF8_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* Byte length (1-4) of the UTF-8 sequence starting with byte c, or 1 if
+ * c is not a valid leading byte (so callers can still advance). */
+int fl_utf8len1(char c);
+
+/* Decodes one UTF-8 sequence at p (not reading past end, if end != NULL)
+ * into a UCS-4 codepoint, and sets *len to the number of bytes consumed.
+ * Invalid sequences decode byte-for-byte as CP1252 (matching upstream's
+ * ERRORS_TO_CP1252 default, which lets stray Latin-1/CP1252 text that
+ * ended up somewhere UTF-8 was expected still show up as something
+ * reasonable instead of a wall of replacement characters), and set
+ * *len = 1. */
+unsigned fl_utf8decode(const char *p, const char *end, int *len);
+
+/* Encodes ucs (0-0x10ffff) as UTF-8 into buf (up to 4 bytes, buf must
+ * have room) and returns the number of bytes written. */
+int fl_utf8encode(unsigned ucs, char *buf);
+
+/* ASCII-only case folding -- see header note above. */
+int fl_tolower(unsigned int ucs);
+int fl_toupper(unsigned int ucs);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* CFLTK_FL_UTF8_H */
