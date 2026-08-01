@@ -324,6 +324,11 @@ static inline Fl_Color fl_gray_color(uchar g) {
 #define FL_Alt_L         0xffe9
 #define FL_Alt_R         0xffea
 
+/* Mouse buttons, as returned by Fl_event_button(). */
+#define FL_LEFT_MOUSE    1
+#define FL_MIDDLE_MOUSE  2
+#define FL_RIGHT_MOUSE   3
+
 /* Fl::event_state() bit masks */
 #define FL_SHIFT     0x00010000
 #define FL_CAPS_LOCK 0x00020000

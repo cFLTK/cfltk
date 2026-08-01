@@ -8,7 +8,7 @@ CC      ?= cc
 # otherwise flags every single one of them.
 CFLAGS  ?= -std=c99 -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -g -Iinclude
 X11_CFLAGS := $(shell pkg-config --cflags x11 xft)
-X11_LIBS   := $(shell pkg-config --libs x11 xft)
+X11_LIBS   := $(shell pkg-config --libs x11 xft) -lm
 
 CORE_SRCS := \
     src/core/Fl_Widget.c \
@@ -38,7 +38,23 @@ CORE_SRCS := \
     src/menu/Fl_Choice.c \
     src/menu/Fl_Menu_Bar.c \
     src/draw/fl_draw.c \
-    src/draw/fl_colormap.c
+    src/draw/fl_colormap.c \
+    src/valuators/Fl_Valuator.c \
+    src/valuators/Fl_Slider.c \
+    src/valuators/Fl_Fill_Slider.c \
+    src/valuators/Fl_Hor_Slider.c \
+    src/valuators/Fl_Hor_Fill_Slider.c \
+    src/valuators/Fl_Nice_Slider.c \
+    src/valuators/Fl_Hor_Nice_Slider.c \
+    src/valuators/Fl_Value_Slider.c \
+    src/valuators/Fl_Hor_Value_Slider.c \
+    src/valuators/Fl_Scrollbar.c \
+    src/valuators/Fl_Dial.c \
+    src/valuators/Fl_Fill_Dial.c \
+    src/valuators/Fl_Line_Dial.c \
+    src/valuators/Fl_Counter.c \
+    src/valuators/Fl_Simple_Counter.c \
+    src/valuators/Fl_Roller.c
 
 X11_SRCS := \
     src/backend/x11/fl_x11_window.c \
@@ -70,6 +86,7 @@ examples: $(LIB)
 	$(CC) $(CFLAGS) examples/radio/radio.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/radio
 	$(CC) $(CFLAGS) examples/input/input.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/input
 	$(CC) $(CFLAGS) examples/menus/menus.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/menus
+	$(CC) $(CFLAGS) examples/valuators/valuators.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/valuators
 
 clean:
 	rm -f $(OBJS) $(LIB)

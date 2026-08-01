@@ -51,6 +51,22 @@ set(CFLTK_CORE_SOURCES
     src/menu/Fl_Menu_Bar.c
     src/draw/fl_draw.c
     src/draw/fl_colormap.c
+    src/valuators/Fl_Valuator.c
+    src/valuators/Fl_Slider.c
+    src/valuators/Fl_Fill_Slider.c
+    src/valuators/Fl_Hor_Slider.c
+    src/valuators/Fl_Hor_Fill_Slider.c
+    src/valuators/Fl_Nice_Slider.c
+    src/valuators/Fl_Hor_Nice_Slider.c
+    src/valuators/Fl_Value_Slider.c
+    src/valuators/Fl_Hor_Value_Slider.c
+    src/valuators/Fl_Scrollbar.c
+    src/valuators/Fl_Dial.c
+    src/valuators/Fl_Fill_Dial.c
+    src/valuators/Fl_Line_Dial.c
+    src/valuators/Fl_Counter.c
+    src/valuators/Fl_Simple_Counter.c
+    src/valuators/Fl_Roller.c
 )
 
 set(CFLTK_SOURCES ${CFLTK_CORE_SOURCES})
@@ -76,6 +92,11 @@ if(CFLTK_BACKEND_X11)
     target_compile_options(cfltk PRIVATE ${X11_CFLAGS_OTHER} ${XFT_CFLAGS_OTHER})
 endif()
 
+find_library(CFLTK_MATH_LIB m)
+if(CFLTK_MATH_LIB)
+    target_link_libraries(cfltk PUBLIC ${CFLTK_MATH_LIB})
+endif()
+
 # ---------------------------------------------------------------------
 # Examples
 # ---------------------------------------------------------------------
@@ -95,4 +116,7 @@ if(CFLTK_BUILD_EXAMPLES)
 
     add_executable(menus examples/menus/menus.c)
     target_link_libraries(menus PRIVATE cfltk)
+
+    add_executable(valuators examples/valuators/valuators.c)
+    target_link_libraries(valuators PRIVATE cfltk)
 endif()

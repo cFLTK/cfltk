@@ -52,6 +52,13 @@ under an isolated X11 display):
 | `Enumerations.H` | `include/cfltk/Enumerations.h` |
 | default color map | `include/cfltk/fl_colormap.h`, `src/draw/fl_colormap.c` |
 | Linux/X11 platform layer | `src/backend/x11/*`, seam defined in `src/backend/fl_backend.h` |
+| `Fl_Valuator` | `include/cfltk/Fl_Valuator.h`, `src/valuators/Fl_Valuator.c` |
+| `Fl_Slider` (+ `Fl_Fill_Slider`/`Fl_Hor_Slider`/`Fl_Hor_Fill_Slider`/`Fl_Nice_Slider`/`Fl_Hor_Nice_Slider`) | `include/cfltk/Fl_Slider.h` and siblings, `src/valuators/Fl_Slider.c` and siblings |
+| `Fl_Value_Slider` (+ `Fl_Hor_Value_Slider`) | `include/cfltk/Fl_Value_Slider.h`, `src/valuators/Fl_Value_Slider.c` and siblings |
+| `Fl_Scrollbar` | `include/cfltk/Fl_Scrollbar.h`, `src/valuators/Fl_Scrollbar.c` |
+| `Fl_Dial` (+ `Fl_Fill_Dial`/`Fl_Line_Dial`) | `include/cfltk/Fl_Dial.h` and siblings, `src/valuators/Fl_Dial.c` and siblings |
+| `Fl_Counter` (+ `Fl_Simple_Counter`) | `include/cfltk/Fl_Counter.h`, `src/valuators/Fl_Counter.c` and siblings |
+| `Fl_Roller` | `include/cfltk/Fl_Roller.h`, `src/valuators/Fl_Roller.c` |
 
 ## Cross-cutting translation rules
 
@@ -216,11 +223,37 @@ under an isolated X11 display):
   difference, noted here only because it's the single most intricate
   piece of arithmetic ported so far and worth double-checking against
   `src/Fl_Group.cxx` if resize bugs show up.
+- **`Fl_Dial`'s dot/line indicator** is drawn as a plain trig-computed
+  dot/needle from the hub instead of upstream's small rotated polygon
+  shapes, which rely on a push/translate/scale/rotate transform matrix
+  stack cfltk's drawing API doesn't have. The value↔angle mapping and
+  drag interaction are translated exactly (verified by tracing
+  upstream's `atan2(-my,mx)` mouse-handling formula for the cardinal
+  directions); only the indicator's pixel art differs. `FL_FILL_DIAL`
+  (the pie meter) has no such difference — it's a near-direct
+  translation using `fl_pie()`, which cfltk already has.
+- **`Fl_Counter`'s step-button arrows** are drawn as plain triangles via
+  `fl_polygon3()` instead of upstream's `"@-4<"`/`"@-4>"` `fl_draw_symbol()`
+  glyphs — cfltk hasn't ported the `'@'`-string symbol mini-language
+  `fl_draw_symbol()` depends on. Same arrow count/direction/position,
+  different pixel art.
+- **`Fl_Scrollbar`** has no `"gtk+"` scheme arrow-glyph variant (see the
+  "no color schemes" note above) — always draws the plain-scheme
+  triangle arrows.
+- **Upstream's multi-segment `fl_xyline`/`fl_yxline` overloads** (the
+  4/5-argument forms that draw a connected two- or three-segment path —
+  e.g. vertical-then-horizontal — in one call) have no cfltk equivalent;
+  `fl_draw.h` only provides the single-segment 3-argument forms. Every
+  translated `.c` file that used a multi-arg overload (`Fl_Return_Button`,
+  `Fl_Roller`) manually decomposes it into two or three single-segment
+  calls. Watch for this when porting any new upstream file that draws
+  multi-segment outlines this way.
 
 ## Next phases (not started)
 
-1. More widgets: `Fl_Valuator` family (sliders, dials, counters),
-   `Fl_Browser_`, `Fl_Tabs`, `Fl_Scroll`, `Fl_Text_Buffer`/`Fl_Text_Editor`.
+1. More widgets: `Fl_Browser_`, `Fl_Tabs`, `Fl_Scroll`,
+   `Fl_Text_Buffer`/`Fl_Text_Editor`, `Fl_Adjuster`, `Fl_Value_Input`/
+   `Fl_Value_Output`.
 2. `Fl_Image` + image loaders (behind a compile-time switch).
 3. The rest of the official FLTK example suite (see the contract's
    "Required Validation Programs" list), each one both a port target
