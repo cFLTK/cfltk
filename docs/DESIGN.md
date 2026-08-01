@@ -83,6 +83,8 @@ under an isolated X11 display):
 | `Fl_PNG_Image` (built only when libpng is found, see `CFLTK_ENABLE_PNG`) | `include/cfltk/Fl_PNG_Image.h`, `src/image/Fl_PNG_Image.c` |
 | `Fl_JPEG_Image` (built only when libjpeg is found, see `CFLTK_ENABLE_JPEG`) | `include/cfltk/Fl_JPEG_Image.h`, `src/image/Fl_JPEG_Image.c` |
 | `Fl_Shared_Image` (+ `fl_register_images`/`fl_check_images` from `fl_images_core.cxx`) | `include/cfltk/Fl_Shared_Image.h`, `src/image/Fl_Shared_Image.c` |
+| Directory-listing utilities (new; `fl_filename_list`/`fl_numericsort`/`fl_filename_match`/`fl_filename_isdir`, collected from several small upstream files) | `include/cfltk/fl_filename.h`, `src/core/fl_filename.c` |
+| `Fl_File_Browser` (no `Fl_File_Icon`, see Known differences) | `include/cfltk/Fl_File_Browser.h`, `src/widgets/Fl_File_Browser.c` |
 
 ## Cross-cutting translation rules
 
@@ -566,19 +568,61 @@ under an isolated X11 display):
   `Fl_Image_delete()` itself null-tolerant, which would silently mask
   genuine null-pointer bugs at every *other* call site instead of just
   this one legitimate case.
+- **`Fl_File_Browser` has no `Fl_File_Icon`** (the vector-icon-per-
+  MIME-pattern registry upstream uses to draw a small icon next to
+  each entry). Entries list with text only -- this is a graceful
+  degradation upstream itself already supports natively: real upstream
+  `Fl_File_Browser` checks `Fl_File_Icon::first() == NULL` and falls
+  back to text-only rendering with no icon-space reservation whenever
+  no icons have been registered, which is unconditionally the case
+  here. Consistent with the pre-existing "`Fl_Browser` has no icon
+  support" note above. Directories are still sorted first and shown in
+  **bold**, matching upstream's own `item_draw()` behavior for that
+  part.
+- **`Fl_File_Browser_load("")`'s "list all mounted filesystems" mode
+  only ports the plain Linux `/etc/mnttab`-or-`/etc/mtab`-or-
+  `/etc/fstab`-or-`/etc/vfstab` fallback chain**, not the Windows/OS2/
+  macOS/AIX/NetBSD-specific branches, matching `fl_filename.h`'s own
+  scope note.
+- **Fixed while building and interactively testing
+  `examples/file_browser`: the X11 backend never actually implemented
+  click-multiplicity detection.** Every `ButtonPress`/`ButtonRelease`
+  hardcoded `clicks=1` in the call to `fl_backend_set_event_state()`
+  regardless of timing or position, so `Fl_event_clicks()` could never
+  distinguish a plain click from a double-click -- nothing before this
+  had exercised that path with an actual double-click gesture. Fixed
+  by porting (in simplified form) upstream's own `checkdouble()`/
+  `set_event_xy()` algorithm from `src/Fl_x.cxx`: a `ButtonPress` of
+  the same button within 3px and 1000ms of the previous one increments
+  a click counter (0 = plain click, 1 = double-click, 2 = triple-
+  click, ...); anything else resets it to 0. `ButtonRelease` reuses the
+  count from the `ButtonPress` that started the click, matching
+  upstream (release never recomputes it). This is a real backend gap,
+  not specific to `Fl_File_Browser` -- any widget relying on
+  `Fl_event_clicks()` (word/line-select-on-multi-click in
+  `Fl_Text_Display`, double-click-to-navigate here) was affected.
+- **Not a bug, but easy to trip over (caught building
+  `examples/file_browser`): a plain `Fl_Browser` (`Fl_File_Browser`'s
+  base, unchanged) defaults to `FL_NORMAL_BROWSER`, which never
+  selects on click or fires its callback at all** -- that is genuinely
+  upstream's own behavior; `FL_HOLD_BROWSER`/`FL_SELECT_BROWSER`/
+  `FL_MULTI_BROWSER` exist specifically to add click-selection on top
+  of the plain type, and callers wanting double-click-to-open behavior
+  must also OR `FL_WHEN_ENTER_KEY` into `when()` (FLTK's real, if
+  confusingly-named, flag for "also fire the callback on a
+  double-click"). `examples/file_browser` sets both explicitly.
 
 ## Next phases (not started)
 
-1. `Fl_File_Browser`.
-3. The rest of the official FLTK example suite (see the contract's
+1. The rest of the official FLTK example suite (see the contract's
    "Required Validation Programs" list), each one both a port target
    and a regression check on the core.
-4. Automated regression tests (widget lifecycle, event propagation,
+2. Automated regression tests (widget lifecycle, event propagation,
    layout/resize, parent/child bookkeeping) — none exist yet; phase 1
    was validated by visual inspection of `examples/hello` only.
-5. Dillo integration once the widget set Dillo's `dw::fltk` needs is
+3. Dillo integration once the widget set Dillo's `dw::fltk` needs is
    covered.
-6. A NuttX/NX backend implementing the exact `src/backend/fl_backend.h`
+4. A NuttX/NX backend implementing the exact `src/backend/fl_backend.h`
    seam the X11 backend implements now.
 
 ## Reference source

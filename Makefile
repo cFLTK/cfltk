@@ -23,6 +23,7 @@ CORE_SRCS := \
     src/core/Fl_Group.c \
     src/core/Fl.c \
     src/core/fl_utf8.c \
+    src/core/fl_filename.c \
     src/widgets/Fl_Window.c \
     src/widgets/Fl_Box.c \
     src/widgets/Fl_Button.c \
@@ -48,6 +49,7 @@ CORE_SRCS := \
     src/widgets/Fl_Hold_Browser.c \
     src/widgets/Fl_Multi_Browser.c \
     src/widgets/Fl_Check_Browser.c \
+    src/widgets/Fl_File_Browser.c \
     src/text/Fl_Text_Buffer.c \
     src/text/Fl_Text_Display.c \
     src/text/Fl_Text_Editor.c \
@@ -144,6 +146,7 @@ examples: $(LIB)
 	$(CC) $(CFLAGS) examples/valuators/valuators.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/valuators
 	$(CC) $(CFLAGS) examples/tabs_scroll/tabs_scroll.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/tabs_scroll
 	$(CC) $(CFLAGS) examples/browser/browser.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/browser
+	$(CC) $(CFLAGS) examples/file_browser/file_browser.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/file_browser
 	$(CC) $(CFLAGS) examples/text_editor/text_editor.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/text_editor
 	$(CC) $(CFLAGS) examples/images/images.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) -o $(BUILD_DIR)/images
 	$(CC) $(CFLAGS) $(IMG_CFLAGS) examples/loaders/loaders.c -L$(BUILD_DIR) -lcfltk $(X11_LIBS) $(IMG_LIBS) -o $(BUILD_DIR)/loaders

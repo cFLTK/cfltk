@@ -22,6 +22,20 @@ static Fl_Window *find_window(Window xid) {
     return NULL;
 }
 
+/* Click-multiplicity (double/triple-click) tracking, ported in spirit
+ * from src/Fl_x.cxx's checkdouble()/set_event_xy(): a second ButtonPress
+ * of the same button within 1000ms and 3px of the previous one bumps
+ * the click count (Fl_event_clicks(): 0 for a plain click, 1 for a
+ * double-click, 2 for a triple-click, ...); anything else resets it to
+ * 0. Found missing (every click hardcoded clicks=1) while building and
+ * interactively testing Fl_File_Browser's double-click-to-navigate
+ * example -- nothing in the X11 backend had ever exercised
+ * Fl_event_clicks() from a real double-click before. */
+static int g_last_click_button = 0;
+static int g_last_click_x = 0, g_last_click_y = 0;
+static Time g_last_click_time = 0;
+static int g_click_count = 0;
+
 static int translate_button_state(unsigned int xstate) {
     int s = 0;
     if (xstate & ShiftMask) s |= FL_SHIFT;
@@ -59,14 +73,41 @@ static int dispatch_one(XEvent *ev) {
             return 1;
         }
 
-        case ButtonPress:
+        case ButtonPress: {
+            int dx, dy;
+            win = find_window(ev->xbutton.window);
+            if (!win) return 0;
+
+            dx = ev->xbutton.x_root - g_last_click_x;
+            dy = ev->xbutton.y_root - g_last_click_y;
+            if (dx < 0) dx = -dx;
+            if (dy < 0) dy = -dy;
+
+            if ((int)ev->xbutton.button == g_last_click_button && dx + dy <= 3 &&
+                (Time)(ev->xbutton.time - g_last_click_time) < 1000)
+                g_click_count++;
+            else
+                g_click_count = 0;
+
+            g_last_click_button = (int)ev->xbutton.button;
+            g_last_click_x = ev->xbutton.x_root;
+            g_last_click_y = ev->xbutton.y_root;
+            g_last_click_time = ev->xbutton.time;
+
+            fl_backend_set_event_state(ev->xbutton.x, ev->xbutton.y, ev->xbutton.x_root, ev->xbutton.y_root,
+                                        0, 0, (int)ev->xbutton.button, g_click_count, 1,
+                                        translate_button_state(ev->xbutton.state), 0, NULL, 0);
+            Fl_context_handle(FL_PUSH, win);
+            return 1;
+        }
+
         case ButtonRelease: {
             win = find_window(ev->xbutton.window);
             if (!win) return 0;
             fl_backend_set_event_state(ev->xbutton.x, ev->xbutton.y, ev->xbutton.x_root, ev->xbutton.y_root,
-                                        0, 0, (int)ev->xbutton.button, 1, 1,
+                                        0, 0, (int)ev->xbutton.button, g_click_count, 1,
                                         translate_button_state(ev->xbutton.state), 0, NULL, 0);
-            Fl_context_handle(ev->type == ButtonPress ? FL_PUSH : FL_RELEASE, win);
+            Fl_context_handle(FL_RELEASE, win);
             return 1;
         }
 

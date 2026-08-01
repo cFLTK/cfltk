@@ -29,6 +29,7 @@ set(CFLTK_CORE_SOURCES
     src/core/Fl_Group.c
     src/core/Fl.c
     src/core/fl_utf8.c
+    src/core/fl_filename.c
     src/widgets/Fl_Window.c
     src/widgets/Fl_Box.c
     src/widgets/Fl_Button.c
@@ -54,6 +55,7 @@ set(CFLTK_CORE_SOURCES
     src/widgets/Fl_Hold_Browser.c
     src/widgets/Fl_Multi_Browser.c
     src/widgets/Fl_Check_Browser.c
+    src/widgets/Fl_File_Browser.c
     src/text/Fl_Text_Buffer.c
     src/text/Fl_Text_Display.c
     src/text/Fl_Text_Editor.c
@@ -187,6 +189,9 @@ if(CFLTK_BUILD_EXAMPLES)
 
     add_executable(browser examples/browser/browser.c)
     target_link_libraries(browser PRIVATE cfltk)
+
+    add_executable(file_browser examples/file_browser/file_browser.c)
+    target_link_libraries(file_browser PRIVATE cfltk)
 
     add_executable(text_editor examples/text_editor/text_editor.c)
     target_link_libraries(text_editor PRIVATE cfltk)
