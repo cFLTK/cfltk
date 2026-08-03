@@ -111,6 +111,17 @@ typedef struct Fl_Graphics_Driver {
      * 1 = closed loop (last point connects back to the first). */
     void (*fill_polygon)(const int *xs, const int *ys, int n);
     void (*draw_polyline)(const int *xs, const int *ys, int n, int closed);
+
+    /* Real per-glyph ink-extent measurement (the actual painted pixel
+     * bounding box, which can differ from the advance-width-based
+     * width()/height() above - e.g. an italic "f" or a glyph with
+     * overhang/underhang) in the current font, matching upstream's
+     * fl_text_extents(). (*dx,*dy) is the ink box's top-left corner
+     * relative to the text's pen-origin (usually small negative
+     * numbers), (*w,*h) its size. Appended at the end of the vtable
+     * (not inserted earlier) since every struct literal initializing
+     * one of these is positional, not designated. */
+    void (*text_extents)(const char *text, int n, int *dx, int *dy, int *w, int *h);
 } Fl_Graphics_Driver;
 
 /* Installed by the platform backend before any drawing happens. */
@@ -235,6 +246,16 @@ static inline double fl_width_str(const char *txt) { return fl_width(txt, txt ? 
 static inline void fl_draw_text(const char *str, int n, int x, int y) { fl_graphics_driver()->draw_text(str, n, x, y); }
 void fl_draw(const char *str, int x, int y);
 void fl_measure(const char *str, int *w, int *h, int draw_symbols);
+
+/* Real per-glyph ink-extent measurement in the current font - see
+ * Fl_Graphics_Driver.text_extents' own doc comment above for the
+ * (dx,dy,w,h) semantics. Matches upstream's fl_text_extents(). */
+static inline void fl_text_extents(const char *txt, int n, int *dx, int *dy, int *w, int *h) {
+    fl_graphics_driver()->text_extents(txt, n, dx, dy, w, h);
+}
+static inline void fl_text_extents_str(const char *txt, int *dx, int *dy, int *w, int *h) {
+    fl_text_extents(txt, txt ? (int)strlen(txt) : 0, dx, dy, w, h);
+}
 
 /* ------------------------------------------------------------------ */
 /* Raw image blit/read-back (see Fl_Graphics_Driver::draw_image/       */

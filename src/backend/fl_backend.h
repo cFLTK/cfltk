@@ -45,6 +45,12 @@ void fl_backend_window_relabel(Fl_Window *win);
  * values get applied once at window-creation time instead). */
 void fl_backend_window_resize_hints(Fl_Window *win);
 
+/* Forces this window's drawing context current (X11: sets
+ * fl_x11_current_target so subsequent draw/measure calls target this
+ * window, matching upstream's Fl_Window::make_current()). No-op if
+ * the window isn't shown yet. */
+void fl_backend_window_make_current(Fl_Window *win);
+
 /* Blits/exposes whatever cfltk drew into the window's damaged area. */
 void fl_backend_window_flush(Fl_Window *win);
 

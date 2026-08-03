@@ -215,6 +215,12 @@ void fl_backend_window_relabel(Fl_Window *win) {
     if (icon_label) XSetIconName(fl_x11_display, xw->real_xid, icon_label);
 }
 
+void fl_backend_window_make_current(Fl_Window *win) {
+    Fl_X11_Window *xw = fl_x11_window_data(win);
+    if (!xw) return;
+    fl_x11_current_target = xw;
+}
+
 void fl_backend_window_resize_hints(Fl_Window *win) {
     Fl_X11_Window *xw = fl_x11_window_data(win);
     XSizeHints hints;

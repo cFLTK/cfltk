@@ -160,6 +160,10 @@ void Fl_Window_set_size_range(Fl_Window *self, int minw, int minh, int maxw, int
     if (self->shown) fl_backend_window_resize_hints(self);
 }
 
+void Fl_Window_make_current(Fl_Window *self) {
+    if (self->shown) fl_backend_window_make_current(self);
+}
+
 void Fl_Window_set_border(Fl_Window *self, int b) {
     if (b) self->group.widget.flags &= ~(unsigned)FL_WIDGET_NOBORDER;
     else self->group.widget.flags |= FL_WIDGET_NOBORDER;

@@ -112,6 +112,13 @@ static inline const char *Fl_Window_icon_label(const Fl_Window *self) {
  * show(). */
 void Fl_Window_set_size_range(Fl_Window *self, int minw, int minh, int maxw, int maxh);
 
+/* Forces this window's drawing context current - matches upstream's
+ * Fl_Window::make_current(), used before issuing draw/measure calls
+ * outside the normal expose/flush callback (e.g. an immediately-drawn
+ * cmdline-supplied URL, before the event loop's first real expose).
+ * No-op if the window isn't shown yet. */
+void Fl_Window_make_current(Fl_Window *self);
+
 static inline unsigned int Fl_Window_border(const Fl_Window *self) {
     return !(self->group.widget.flags & FL_WIDGET_NOBORDER);
 }

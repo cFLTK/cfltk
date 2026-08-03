@@ -399,6 +399,22 @@ static void d_draw_text(const char *str, int n, int x, int y) {
     XftDrawStringUtf8(fl_x11_current_target->xft_draw, &g_xft_color, f, x, y, (const FcChar8 *)str, n);
 }
 
+static void d_text_extents(const char *text, int n, int *dx, int *dy, int *w, int *h) {
+    XftFont *f;
+    XGlyphInfo extents;
+    if (!text || n <= 0) { *dx = *dy = *w = *h = 0; return; }
+    f = load_font(g_current_font, g_current_size);
+    if (!f) { *dx = *dy = *w = *h = 0; return; }
+    XftTextExtentsUtf8(fl_x11_display, f, (const FcChar8 *)text, n, &extents);
+    /* Xft's XGlyphInfo.x/y is the offset from the pen origin to the
+     * ink box's top-left corner, stored negated (matches how
+     * upstream's own Xft-based fl_text_extents() reads it). */
+    *dx = -extents.x;
+    *dy = -extents.y;
+    *w = (int)extents.width;
+    *h = (int)extents.height;
+}
+
 /* ------------------------------------------------------------------ */
 /* Raw image blit/read-back                                            */
 /*                                                                      */
@@ -525,7 +541,8 @@ static const Fl_Graphics_Driver g_driver = {
     d_draw_text,
     d_draw_image, d_read_image,
     d_draw_bitmask,
-    d_fill_polygon, d_draw_polyline
+    d_fill_polygon, d_draw_polyline,
+    d_text_extents
 };
 
 const Fl_Graphics_Driver *fl_x11_graphics_driver(void) { return &g_driver; }
