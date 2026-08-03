@@ -495,10 +495,56 @@ void Fl_flush(void) {
     }
 }
 
+/* -------------------------------------------------------------------
+ * Deferred widget deletion (Fl_delete_widget(), see Fl.h)
+ * ------------------------------------------------------------------ */
+
+#define DELETE_QUEUE_MAX 64
+static Fl_Widget *g_delete_queue[DELETE_QUEUE_MAX];
+static int g_delete_queue_count = 0;
+
+void Fl_delete_widget(Fl_Widget *w) {
+    int i;
+    if (!w) return;
+    for (i = 0; i < g_delete_queue_count; i++)
+        if (g_delete_queue[i] == w) return; /* already queued */
+    if (g_delete_queue_count < DELETE_QUEUE_MAX)
+        g_delete_queue[g_delete_queue_count++] = w;
+    else
+        Fl_Widget_delete(w); /* queue full (should never happen in practice): fall back to immediate */
+}
+
+/* Actually destroys every queued widget, safe to call once the event
+ * that queued them has finished processing (never from inside a
+ * widget's own callback, which is the entire point of deferring this
+ * in the first place - see Fl_delete_widget()'s header comment). Skips
+ * any queued widget that is a descendant of another widget also in the
+ * queue: Fl_Widget_delete() on a group already recursively destroys
+ * its children (see Fl_Widget_delete()'s own contract), so deleting
+ * both would double-free the descendant. */
+static void Fl_process_delete_queue(void) {
+    int i, j;
+    if (!g_delete_queue_count) return;
+    for (i = 0; i < g_delete_queue_count; i++) {
+        int is_descendant = 0;
+        for (j = 0; j < g_delete_queue_count; j++) {
+            if (i == j) continue;
+            if (Fl_Widget_contains(g_delete_queue[j], g_delete_queue[i])) {
+                is_descendant = 1;
+                break;
+            }
+        }
+        if (!is_descendant)
+            Fl_Widget_delete(g_delete_queue[i]);
+    }
+    g_delete_queue_count = 0;
+}
+
 double Fl_wait_for(double seconds) {
     double clamped = process_timeouts(seconds);
     int got_event = fl_backend_wait(clamped);
     process_timeouts(0.0); /* fire anything whose deadline landed during the wait */
+    Fl_process_delete_queue();
     Fl_flush();
     return got_event ? 1.0 : 0.0;
 }

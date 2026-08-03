@@ -152,6 +152,19 @@ int Fl_ready(void);
 void Fl_flush(void);
 void Fl_redraw(void);
 
+/* Queues `w` for deletion once the event currently being processed has
+ * finished (drained at the top of every Fl_wait_for() iteration, before
+ * the next event is dispatched and before Fl_flush() redraws anything
+ * else) - matches upstream's Fl::delete_widget(), safe to call from
+ * inside a widget's own callback to remove/replace itself, unlike
+ * Fl_Widget_delete() (immediate - freeing a widget while its own
+ * callback is still executing is a use-after-free). Idempotent (queuing
+ * the same widget twice is a no-op) and safe to call with multiple
+ * widgets in an ancestor/descendant relationship - only the outermost
+ * ancestor actually gets deleted, since deleting it already destroys
+ * its children (see Fl_Widget_delete()'s own contract). */
+void Fl_delete_widget(Fl_Widget *w);
+
 Fl_Window *Fl_first_window(void);
 Fl_Window *Fl_next_window(const Fl_Window *window);
 
