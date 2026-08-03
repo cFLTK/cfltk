@@ -21,6 +21,9 @@
  * Known differences: no fl_utf8toUtf16()/fl_utf8fromUtf16() (Windows-only
  * upstream, irrelevant to the X11/NuttX targets this port cares about),
  * no fl_utf8fwd()/fl_utf8back() (not needed by anything ported so far).
+ * fl_utf8test()/fl_utf_nb_char() are now implemented (added for a
+ * downstream embedder that needed UTF-8 validity testing and byte
+ * counting beyond decode/encode).
  */
 #ifndef CFLTK_FL_UTF8_H
 #define CFLTK_FL_UTF8_H
@@ -49,6 +52,16 @@ int fl_utf8encode(unsigned ucs, char *buf);
 /* ASCII-only case folding -- see header note above. */
 int fl_tolower(unsigned int ucs);
 int fl_toupper(unsigned int ucs);
+
+/* Examines the first srclen bytes of src. Returns 0 if not legal UTF-8,
+ * 1 if all ASCII, 2 if all below 0x800, 3 if all below 0x10000, and 4
+ * otherwise. Rejects truncated sequences, invalid continuation bytes,
+ * overlong encodings and UTF-16 surrogate halves. */
+int fl_utf8test(const char *src, unsigned int srclen);
+
+/* Counts the number of UTF-8 characters (i.e. non-continuation bytes)
+ * in the first len bytes of str. */
+int fl_utf_nb_char(const unsigned char *str, int len);
 
 #ifdef __cplusplus
 }

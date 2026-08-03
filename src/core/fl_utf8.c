@@ -107,3 +107,68 @@ int fl_toupper(unsigned int ucs) {
     if (ucs >= 'a' && ucs <= 'z') return (int)(ucs - 'a' + 'A');
     return (int)ucs;
 }
+
+/* Byte length (1-4) of the UTF-8 sequence starting with byte c, or -1
+ * if c cannot start a valid sequence (continuation byte, or one of the
+ * bytes 0xf5-0xff that can never appear in valid UTF-8). Distinct from
+ * fl_utf8len1() above (which always returns >=1, for callers that just
+ * need to advance past bad bytes) - this one needs to distinguish
+ * "invalid" for fl_utf8test()'s strict validation. */
+static int utf8_seq_len(unsigned char c) {
+    if (c < 0x80) return 1;
+    if (c < 0xc2) return -1;
+    if (c < 0xe0) return 2;
+    if (c < 0xf0) return 3;
+    if (c < 0xf5) return 4;
+    return -1;
+}
+
+int fl_utf8test(const char *src, unsigned int srclen) {
+    unsigned int i = 0;
+    int result = 1;
+
+    while (i < srclen) {
+        unsigned char c = (unsigned char)src[i];
+        int seqlen = utf8_seq_len(c);
+        unsigned int cp;
+        int j;
+
+        if (seqlen < 0) return 0;
+        if (seqlen == 1) { i++; continue; }
+        if (i + (unsigned int)seqlen > srclen) return 0;
+        for (j = 1; j < seqlen; j++) {
+            if (((unsigned char)src[i + j] & 0xc0) != 0x80) return 0;
+        }
+
+        cp = (unsigned int)(c & (0xff >> (seqlen + 1)));
+        for (j = 1; j < seqlen; j++)
+            cp = (cp << 6) | ((unsigned char)src[i + j] & 0x3f);
+
+        /* reject overlong encodings, surrogate halves, and out-of-range */
+        if ((seqlen == 2 && cp < 0x80) ||
+            (seqlen == 3 && cp < 0x800) ||
+            (seqlen == 4 && cp < 0x10000) ||
+            (cp >= 0xd800 && cp <= 0xdfff) ||
+            cp > 0x10ffff)
+            return 0;
+
+        if (cp >= 0x10000) {
+            if (result < 4) result = 4;
+        } else if (cp >= 0x800) {
+            if (result < 3) result = 3;
+        } else {
+            if (result < 2) result = 2;
+        }
+
+        i += (unsigned int)seqlen;
+    }
+    return result;
+}
+
+int fl_utf_nb_char(const unsigned char *str, int len) {
+    int i, n = 0;
+    for (i = 0; i < len; i++) {
+        if ((str[i] & 0xc0) != 0x80) n++;
+    }
+    return n;
+}
