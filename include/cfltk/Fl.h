@@ -206,6 +206,11 @@ void Fl_delete_widget(Fl_Widget *w);
 Fl_Window *Fl_first_window(void);
 Fl_Window *Fl_next_window(const Fl_Window *window);
 
+/* Returns the currently-shown modal window, or NULL if none, matching
+ * upstream's Fl::modal(). See Fl_Window_set_modal() (Fl_Window.h) for
+ * how a window becomes modal. */
+Fl_Window *Fl_modal(void);
+
 /* Returns cfltk's own version string (e.g. "0.1.0"), matching upstream
  * FLTK's Fl::api_version() in spirit (a runtime-queryable version) -
  * previously the only place cfltk's version was recorded anywhere was
@@ -241,6 +246,11 @@ void Fl_context_widget_hidden(Fl_Widget *w, Fl_Window *win);
 /* Window-list management, called only by Fl_Window.c / the backend. */
 void Fl_context_register_window(Fl_Window *win);
 void Fl_context_unregister_window(Fl_Window *win);
+
+/* Sets/clears the currently-modal window, called only by
+ * Fl_Window.c's show()/hide(). Use Fl_modal() (public, below) to read
+ * it. */
+void Fl_context_set_modal_window(Fl_Window *win);
 
 /* Temporarily offsets event_x()/event_y() while dispatching into a child
  * window's widget tree (upstream's Fl_Group.cxx `send()` helper does the

@@ -87,6 +87,7 @@ void Fl_Window_show(Fl_Widget *self_w) {
         self->shown = 1;
         Fl_context_register_window(self);
     }
+    if (self_w->flags & FL_WIDGET_MODAL) Fl_context_set_modal_window(self);
     fl_backend_window_show(self);
     Fl_Widget_default_show(self_w);
     if (newly_created) {
@@ -108,6 +109,7 @@ void Fl_Window_show(Fl_Widget *self_w) {
 void Fl_Window_hide(Fl_Widget *self_w) {
     Fl_Window *self = (Fl_Window *)self_w;
     if (!self->shown) return;
+    if (Fl_modal() == self) Fl_context_set_modal_window(NULL);
     fl_backend_window_hide(self);
     fl_backend_window_destroy(self);
     self->shown = 0;

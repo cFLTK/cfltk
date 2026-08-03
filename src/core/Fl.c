@@ -469,6 +469,15 @@ Fl_Window *Fl_first_window(void) { return g_ctx.first_shown_window; }
 Fl_Window *Fl_next_window(const Fl_Window *window) { return window->next_shown; }
 
 /* -------------------------------------------------------------------
+ * Modality (Fl::modal(), see Fl_Window_set_modal() in Fl_Window.h)
+ * ---------------------------------------------------------------- */
+
+static Fl_Window *g_modal_window = NULL;
+
+void Fl_context_set_modal_window(Fl_Window *win) { g_modal_window = win; }
+Fl_Window *Fl_modal(void) { return g_modal_window; }
+
+/* -------------------------------------------------------------------
  * Central event dispatch (simplified translation of Fl::handle_()).
  *
  * Known differences from upstream: no grab()/modal() stack (popup/dialog
@@ -480,6 +489,23 @@ int Fl_context_handle(int event, Fl_Window *window) {
     Fl_Widget *wi = FL_WIDGET(window);
     g_ctx.event = event;
     if (!window) return 0;
+
+    /* Modal input gating (Fl::modal(), see Fl_Window_set_modal()): a
+     * shown modal window blocks input events from reaching any *other*
+     * window, matching upstream's Fl::handle_() modal check. Window-
+     * management events (SHOW/HIDE/CLOSE) still pass through so a
+     * blocked-but-still-visible window keeps repainting/responding to
+     * the WM correctly - only the interactive input events a real user
+     * could use to work around the modal dialog are dropped. */
+    if (g_modal_window && window != g_modal_window) {
+        switch (event) {
+            case FL_PUSH: case FL_RELEASE: case FL_DRAG: case FL_MOVE:
+            case FL_KEYDOWN: case FL_KEYUP: case FL_MOUSEWHEEL:
+                return 0;
+            default:
+                break;
+        }
+    }
 
     switch (event) {
         case FL_CLOSE:

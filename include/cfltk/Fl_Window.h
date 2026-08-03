@@ -112,6 +112,20 @@ static inline const char *Fl_Window_icon_label(const Fl_Window *self) {
  * show(). */
 void Fl_Window_set_size_range(Fl_Window *self, int minw, int minh, int maxw, int maxh);
 
+/* Marks this window modal: once shown, it becomes Fl_modal() and
+ * input events (push/release/drag/move/keyboard/wheel) targeting any
+ * *other* window are dropped until it's hidden again - matching
+ * upstream's Fl_Window::set_modal(). Call before show(). */
+static inline void Fl_Window_set_modal(Fl_Window *self) {
+    self->group.widget.flags |= FL_WIDGET_MODAL;
+}
+/* Marks this window "non-modal": stays on top like a modal window but
+ * does not block input to other windows - matching upstream's
+ * Fl_Window::set_non_modal(). */
+static inline void Fl_Window_set_non_modal(Fl_Window *self) {
+    self->group.widget.flags |= FL_WIDGET_NON_MODAL;
+}
+
 /* Forces this window's drawing context current - matches upstream's
  * Fl_Window::make_current(), used before issuing draw/measure calls
  * outside the normal expose/flush callback (e.g. an immediately-drawn
