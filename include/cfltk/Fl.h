@@ -145,6 +145,26 @@ void Fl_remove_idle(Fl_Timeout_Handler *cb, void *data);
 int Fl_has_idle(Fl_Timeout_Handler *cb, void *data);
 
 /* -------------------------------------------------------------------
+ * fd watching, matching upstream's Fl::add_fd()/remove_fd(): hooks a
+ * file descriptor's readiness directly into the event loop's own
+ * select() call (X11 backend), so a ready socket wakes Fl_wait_for()
+ * the same way an X event does - no separate polling loop needed.
+ * `when` is a bitmask of FL_READ/FL_WRITE/FL_EXCEPT. Removing only
+ * some bits (not all the ones the fd was added with) leaves it
+ * registered for the rest, matching upstream and Fl_remove_timeout()'s
+ * own precedent.
+ * ---------------------------------------------------------------- */
+
+#define FL_READ   1
+#define FL_WRITE  4
+#define FL_EXCEPT 8
+
+typedef void (Fl_FD_Handler)(int fd, void *data);
+
+void Fl_add_fd(int fd, int when, Fl_FD_Handler *cb, void *data);
+void Fl_remove_fd(int fd, int when);
+
+/* -------------------------------------------------------------------
  * Focus / mouse-tracking widgets -- mirrors Fl::focus()/pushed()/
  * belowmouse(), split into getter/setter pairs since C has no overloading.
  * ---------------------------------------------------------------- */

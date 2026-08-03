@@ -174,6 +174,62 @@ int fl_backend_ready(void) {
     return fl_x11_display && XPending(fl_x11_display) > 0;
 }
 
+/* -------------------------------------------------------------------
+ * fd watching (Fl_add_fd()/Fl_remove_fd(), see Fl.h)
+ *
+ * Upstream FLTK's own Unix/X11 backend does exactly this: select()
+ * over the X connection fd *and* every registered fd in the same
+ * call, so a ready socket wakes the event loop the same way an X
+ * event does - no separate polling loop needed. Previously cfltk had
+ * no such mechanism at all (its own Fl.h banner: "Timers, add_fd(),
+ * clipboard, ... intentionally minimal or absent in this phase"), so
+ * a downstream embedder (a browser, entirely non-blocking-socket-
+ * driven) had to build a complete, self-contained replacement outside
+ * cfltk (its own select()-based registry, manually interleaved with
+ * Fl_wait_for()). Ported that same design back in here, including a
+ * real bug it found and fixed the hard way: dispatching must snapshot
+ * every ready {fd, callback, data} triple *before* invoking any
+ * callback, since a callback commonly calls Fl_remove_fd() on itself
+ * or another fd (e.g. tearing down a window closes every socket it
+ * had open) - iterating the live registry while a callback shrinks it
+ * out from under the loop is a real, previously-hit SIGSEGV (stale
+ * index / wrong entry / freed memory), not a hypothetical concern. */
+#define FL_FD_MAX 64
+typedef struct { int fd; int when; Fl_FD_Handler *cb; void *data; int active; } Fl_FD_Slot;
+static Fl_FD_Slot g_fds[FL_FD_MAX];
+static int g_fd_count = 0; /* number of active slots */
+
+void Fl_add_fd(int fd, int when, Fl_FD_Handler *cb, void *data) {
+    int i;
+    if (fd < 0) return;
+    for (i = 0; i < FL_FD_MAX; i++) {
+        if (!g_fds[i].active) {
+            g_fds[i].active = 1;
+            g_fds[i].fd = fd;
+            g_fds[i].when = when;
+            g_fds[i].cb = cb;
+            g_fds[i].data = data;
+            g_fd_count++;
+            return;
+        }
+    }
+    /* Pool exhausted: silently dropped, same policy as Fl_add_timeout(). */
+}
+
+void Fl_remove_fd(int fd, int when) {
+    int i;
+    if (fd < 0) return;
+    for (i = 0; i < FL_FD_MAX; i++) {
+        if (g_fds[i].active && g_fds[i].fd == fd) {
+            g_fds[i].when &= ~when;
+            if (g_fds[i].when == 0) {
+                g_fds[i].active = 0;
+                g_fd_count--;
+            }
+        }
+    }
+}
+
 int fl_backend_wait(double timeout_secs) {
     int dispatched = 0;
 
@@ -187,19 +243,57 @@ int fl_backend_wait(double timeout_secs) {
     if (dispatched) return 1;
 
     {
-        int fd = ConnectionNumber(fl_x11_display);
-        fd_set set;
+        int xfd = ConnectionNumber(fl_x11_display);
+        fd_set rfds, wfds, efds;
         struct timeval tv, *tvp = NULL;
+        int maxfd = xfd, i, n;
 
-        FD_ZERO(&set);
-        FD_SET(fd, &set);
+        FD_ZERO(&rfds);
+        FD_ZERO(&wfds);
+        FD_ZERO(&efds);
+        FD_SET(xfd, &rfds);
+
+        for (i = 0; i < FL_FD_MAX; i++) {
+            if (!g_fds[i].active) continue;
+            if (g_fds[i].when & FL_READ) FD_SET(g_fds[i].fd, &rfds);
+            if (g_fds[i].when & FL_WRITE) FD_SET(g_fds[i].fd, &wfds);
+            if (g_fds[i].when & FL_EXCEPT) FD_SET(g_fds[i].fd, &efds);
+            if (g_fds[i].fd > maxfd) maxfd = g_fds[i].fd;
+        }
+
         if (timeout_secs < 1e10) {
             if (timeout_secs < 0) timeout_secs = 0;
             tv.tv_sec = (long)timeout_secs;
             tv.tv_usec = (long)((timeout_secs - (double)tv.tv_sec) * 1e6);
             tvp = &tv;
         }
-        if (select(fd + 1, &set, NULL, NULL, tvp) <= 0) return 0;
+
+        n = select(maxfd + 1, &rfds, &wfds, &efds, tvp);
+        if (n <= 0) return 0;
+
+        if (g_fd_count > 0) {
+            /* Snapshot before dispatch - see this section's own banner. */
+            struct { int fd; Fl_FD_Handler *cb; void *data; } ready[FL_FD_MAX];
+            int nready = 0;
+            for (i = 0; i < FL_FD_MAX; i++) {
+                int when;
+                if (!g_fds[i].active) continue;
+                when = 0;
+                if (FD_ISSET(g_fds[i].fd, &rfds)) when |= FL_READ;
+                if (FD_ISSET(g_fds[i].fd, &wfds)) when |= FL_WRITE;
+                if (FD_ISSET(g_fds[i].fd, &efds)) when |= FL_EXCEPT;
+                if (when != 0 && (g_fds[i].when & when)) {
+                    ready[nready].fd = g_fds[i].fd;
+                    ready[nready].cb = g_fds[i].cb;
+                    ready[nready].data = g_fds[i].data;
+                    nready++;
+                }
+            }
+            for (i = 0; i < nready; i++) {
+                dispatched = 1;
+                ready[i].cb(ready[i].fd, ready[i].data);
+            }
+        }
     }
 
     while (XPending(fl_x11_display) > 0) {
