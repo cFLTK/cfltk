@@ -329,6 +329,32 @@ static inline Fl_Color fl_gray_color(uchar g) {
 #define FL_Alt_L         0xffe9
 #define FL_Alt_R         0xffea
 
+/* These are long-stable public X11 ABI values (core X11 keysymdef.h and
+ * the XF86 multimedia-key extension, X11/XF86keysym.h respectively),
+ * not FLTK- or cfltk-specific - the X11 backend already passes them
+ * through Fl_event_key() unchanged for any key with no special
+ * cfltk-side mapping, they just previously had no name here. */
+#define FL_F             0xffbd  /**< FL_F+1 == F1, FL_F+2 == F2, etc. */
+#define FL_Menu          0xff67
+#define FL_Print         0xff61
+
+#define FL_Back          0x1008ff26
+#define FL_Forward       0x1008ff27
+#define FL_Stop          0x1008ff28
+#define FL_Refresh       0x1008ff29
+#define FL_Favorites     0x1008ff30
+#define FL_Volume_Down   0x1008ff11
+#define FL_Volume_Mute   0x1008ff12
+#define FL_Volume_Up     0x1008ff13
+#define FL_Media_Play    0x1008ff14
+#define FL_Media_Stop    0x1008ff15
+#define FL_Media_Prev    0x1008ff16
+#define FL_Media_Next    0x1008ff17
+#define FL_Home_Page     0x1008ff18
+#define FL_Mail          0x1008ff19
+#define FL_Search        0x1008ff1b
+#define FL_Sleep         0x1008ff2f
+
 /* Mouse buttons, as returned by Fl_event_button(). */
 #define FL_LEFT_MOUSE    1
 #define FL_MIDDLE_MOUSE  2
