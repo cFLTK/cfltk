@@ -135,7 +135,8 @@ X11_SRCS := \
     src/backend/x11/fl_x11_event.c \
     src/backend/x11/fl_x11_driver.c \
     src/backend/x11/fl_x11_offscreen.c \
-    src/backend/x11/fl_x11_dnd.c
+    src/backend/x11/fl_x11_dnd.c \
+    src/backend/x11/fl_x11_xembed.c
 
 # Fl_PNG_Image/Fl_JPEG_Image are only compiled at all when their library
 # is found via pkg-config -- see include/cfltk/Fl_PNG_Image.h and

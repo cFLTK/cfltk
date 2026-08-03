@@ -102,6 +102,7 @@ void fl_backend_window_create(Fl_Window *win) {
 
     XSetWMProtocols(fl_x11_display, xw->real_xid, &fl_x11_wm_delete_window, 1);
     fl_x11_dnd_window_created(xw->real_xid);
+    fl_x11_xembed_window_created(win, xw->real_xid);
 
     {
         const char *label = Fl_Window_label(win);
@@ -255,10 +256,36 @@ void fl_backend_window_destroy(Fl_Window *win) {
     XFlush(fl_x11_display);
 }
 
+/* Swallows BadDrawable/BadWindow from drawing into a window whose XID
+ * became invalid without cfltk's own knowledge - the one real way
+ * this can happen is an XEmbed-embedded window (Fl_Window_set_embed_xid())
+ * whose embedder disappeared (crashed, exited without reparenting its
+ * children back out first): the X server destroys every reparented
+ * descendant along with a destroyed parent, but cfltk has no
+ * synchronous way to find out before the next flush already tries to
+ * draw into it. Same "catch and continue" precedent as
+ * fl_x11_driver.c's d_read_image() and fl_x11_dnd.c/fl_x11_xembed.c's
+ * own handlers - confirmed necessary by reproducing exactly this
+ * scenario (a test embedder reparenting a cfltk window in, then
+ * exiting without cleanup), which used to take the whole embedded
+ * process down over the embedder's own unrelated exit. */
+static int flush_err_handler(Display *d, XErrorEvent *e) { (void)d; (void)e; return 0; }
+
 void fl_backend_window_flush(Fl_Window *win) {
     Fl_X11_Window *xw = fl_x11_window_data(win);
     Fl_Widget *w = FL_WIDGET(win);
+    XErrorHandler old = NULL;
     if (!xw) return;
+
+    /* Only embedded windows are actually at risk (see the handler's
+     * own comment above) - an ordinary top-level's XID only ever goes
+     * away through cfltk's own Fl_Window_hide() teardown, which
+     * already stops flushing it first. Guarding unconditionally would
+     * also force an XSync() (see below) on every single flush of every
+     * window, a real round-trip-per-redraw cost normal, non-embedded
+     * windows (the overwhelming majority of cfltk usage) have no
+     * reason to pay. */
+    if (win->embed_xid) old = XSetErrorHandler(flush_err_handler);
 
     if (win->double_buffered) resize_offscreen(win, xw, w->w > 0 ? w->w : 1, w->h > 0 ? w->h : 1);
 
@@ -272,7 +299,21 @@ void fl_backend_window_flush(Fl_Window *win) {
         XCopyArea(fl_x11_display, xw->offscreen, xw->real_xid, xw->gc, 0, 0,
                   (unsigned)xw->offscreen_w, (unsigned)xw->offscreen_h, 0, 0);
 
-    XFlush(fl_x11_display);
+    if (win->embed_xid) {
+        /* XSync(), not just XFlush(): the drawing calls above are all
+         * asynchronous (fire-and-forget) requests, so a resulting
+         * BadDrawable/BadWindow only actually reaches this client's
+         * event queue - and this temporary handler - once something
+         * forces a round-trip. Plain XFlush() doesn't wait for (or
+         * guarantee processing of) any error the server sends back,
+         * which could otherwise still arrive later, during a
+         * subsequent XNextEvent() in the main loop, after `old`
+         * (possibly Xlib's own fatal default) is back in place. */
+        XSync(fl_x11_display, False);
+        XSetErrorHandler(old);
+    } else {
+        XFlush(fl_x11_display);
+    }
 }
 
 void fl_backend_grab(Fl_Window *win) {

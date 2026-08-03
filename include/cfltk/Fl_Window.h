@@ -57,6 +57,13 @@ struct Fl_Window {
      * immediately via fl_backend_window_relabel()-style live update if
      * the window is already shown when set. */
     int min_w, min_h, max_w, max_h;
+
+    /* Set by Fl_Window_set_embed_xid() (0 = normal top-level, the
+     * default). Read at window-creation time by the backend to decide
+     * whether to reparent into an existing window belonging to another
+     * client instead of becoming an ordinary WM-managed top-level -
+     * see Fl_Window_set_embed_xid()'s own comment. */
+    unsigned long embed_xid;
 };
 
 extern const Fl_WidgetOps fl_window_ops;
@@ -111,6 +118,20 @@ static inline const char *Fl_Window_icon_label(const Fl_Window *self) {
  * if the window is already shown, otherwise takes effect at the next
  * show(). */
 void Fl_Window_set_size_range(Fl_Window *self, int minw, int minh, int maxw, int maxh);
+
+/* Marks this window for XEmbed (freedesktop.org/wiki/Specifications/
+ * xembed-spec): once shown, instead of becoming an ordinary WM-managed
+ * top-level, it reparents itself into `xid` - an existing window that
+ * belongs to another, potentially unrelated X client (the "embedder",
+ * e.g. a plugin host) - and follows the embedded-client half of the
+ * XEmbed protocol: advertises `_XEMBED_INFO` before mapping, and
+ * translates `_XEMBED` ClientMessages the embedder sends (currently:
+ * XEMBED_FOCUS_IN/XEMBED_FOCUS_OUT) into the normal FL_FOCUS/FL_UNFOCUS
+ * events any other focus-change source already produces - matches
+ * upstream's `-x`/`--xid` window-embedding support. `xid` of 0 means
+ * "not embedded" (the default) - call before Fl_Widget_show(), has no
+ * effect once already shown. */
+void Fl_Window_set_embed_xid(Fl_Window *self, unsigned long xid);
 
 /* Marks this window modal: once shown, it becomes Fl_modal() and
  * input events (push/release/drag/move/keyboard/wheel) targeting any

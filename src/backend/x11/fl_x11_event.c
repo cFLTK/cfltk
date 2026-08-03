@@ -158,6 +158,7 @@ static int dispatch_one(XEvent *ev) {
 
         case ClientMessage: {
             if (fl_x11_dnd_handle_client_message(ev)) return 1;
+            if (fl_x11_xembed_handle_client_message(ev)) return 1;
             win = find_window(ev->xclient.window);
             if (!win) return 0;
             if ((Atom)ev->xclient.data.l[0] == fl_x11_wm_delete_window) {

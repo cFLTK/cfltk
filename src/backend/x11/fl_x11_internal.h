@@ -74,6 +74,10 @@ int fl_x11_dnd_handle_selection_request(XEvent *ev);
  * directly under that name in fl_x11_dnd.c) declared in
  * ../fl_backend.h, not repeated here. */
 
+/* fl_x11_xembed.c -- XEmbed protocol, backing Fl_Window_set_embed_xid(). */
+void fl_x11_xembed_window_created(Fl_Window *win, Window xid); /* call once, right after real_xid exists */
+int fl_x11_xembed_handle_client_message(XEvent *ev); /* dispatch_one()'s ClientMessage case */
+
 /* fl_x11_offscreen.c -- see include/cfltk/fl_draw.h for the public
  * fl_create_offscreen()/... wrappers these back. */
 Fl_Offscreen fl_x11_create_offscreen(int w, int h);

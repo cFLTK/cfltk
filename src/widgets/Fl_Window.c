@@ -53,6 +53,7 @@ void Fl_Window_init(Fl_Window *self, int x, int y, int w, int h, const char *lab
     self->next_shown = NULL;
     self->double_buffered = 0;
     self->min_w = self->min_h = self->max_w = self->max_h = 0;
+    self->embed_xid = 0;
 
     /* Fl_Group_init() already called begin() on this window, matching
      * upstream: the constructor opens the group for adding children, but
@@ -160,6 +161,15 @@ void Fl_Window_set_size_range(Fl_Window *self, int minw, int minh, int maxw, int
     self->max_w = maxw;
     self->max_h = maxh;
     if (self->shown) fl_backend_window_resize_hints(self);
+}
+
+void Fl_Window_set_embed_xid(Fl_Window *self, unsigned long xid) {
+    /* Only takes effect at the next show() (see fl_backend_window_create()) -
+     * matches Fl_Window_set_modal()'s own "call before show()" contract,
+     * since reparenting an already-shown, already-WM-managed window
+     * into an arbitrary other client's window isn't a meaningful
+     * operation to support after the fact. */
+    self->embed_xid = xid;
 }
 
 void Fl_Window_make_current(Fl_Window *self) {
