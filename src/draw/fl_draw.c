@@ -401,9 +401,32 @@ static const Fl_Box_Table_Entry k_box_table[] = {
 };
 #define K_BOX_TABLE_COUNT (int)(sizeof(k_box_table) / sizeof(k_box_table[0]))
 
+/* Custom boxtypes registered via fl_set_boxtype(), indexed by
+ * (boxtype - FL_FREE_BOXTYPE). Matches upstream's own free-boxtype-
+ * numbering convention (FL_FREE_BOXTYPE, see Enumerations.h). */
+#define CUSTOM_BOXTYPES_MAX 32
+static Fl_Box_Table_Entry g_custom_boxtypes[CUSTOM_BOXTYPES_MAX];
+static int g_custom_boxtype_hi = -1; /* highest slot actually registered, -1 = none */
+
+void fl_set_boxtype(uchar new_boxtype, Fl_Box_Draw_F *fn, uchar dx, uchar dy, uchar dw, uchar dh) {
+    int slot = new_boxtype - FL_FREE_BOXTYPE;
+    if (slot < 0 || slot >= CUSTOM_BOXTYPES_MAX) return; /* out of range: silently ignored, same as an invalid upstream call */
+    g_custom_boxtypes[slot].fn = fn;
+    g_custom_boxtypes[slot].dx = dx;
+    g_custom_boxtypes[slot].dy = dy;
+    g_custom_boxtypes[slot].dw = dw;
+    g_custom_boxtypes[slot].dh = dh;
+    g_custom_boxtypes[slot].is_frame = 0;
+    if (slot > g_custom_boxtype_hi) g_custom_boxtype_hi = slot;
+}
+
 static const Fl_Box_Table_Entry *box_entry(uchar boxtype) {
     if (boxtype < K_BOX_TABLE_COUNT) return &k_box_table[boxtype];
-    return &k_box_table[FL_UP_BOX]; /* safe, visible fallback for not-yet-ported types */
+    if (boxtype >= FL_FREE_BOXTYPE) {
+        int slot = boxtype - FL_FREE_BOXTYPE;
+        if (slot <= g_custom_boxtype_hi && g_custom_boxtypes[slot].fn) return &g_custom_boxtypes[slot];
+    }
+    return &k_box_table[FL_UP_BOX]; /* safe, visible fallback for not-yet-ported/unregistered types */
 }
 
 void fl_draw_box(uchar boxtype, int x, int y, int w, int h, Fl_Color c) {
@@ -414,6 +437,7 @@ int fl_box_dy(uchar boxtype) { return box_entry(boxtype)->dy; }
 int fl_box_dw(uchar boxtype) { return box_entry(boxtype)->dw; }
 int fl_box_dh(uchar boxtype) { return box_entry(boxtype)->dh; }
 int fl_box_is_frame(uchar boxtype) { return box_entry(boxtype)->is_frame; }
+Fl_Box_Draw_F *fl_box_fn(uchar boxtype) { return box_entry(boxtype)->fn; }
 
 /* ------------------------------------------------------------------ */
 /* Label drawing/measuring (protected Fl_Label::draw()/measure() in

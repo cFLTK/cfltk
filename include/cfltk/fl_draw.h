@@ -322,6 +322,20 @@ int fl_box_dh(uchar boxtype);
 /** True for FL_..._FRAME box types, which draw a border only (no fill). */
 int fl_box_is_frame(uchar boxtype);
 
+/* The raw draw function backing a boxtype - lets a caller registering a
+ * new custom boxtype reuse an existing one's drawing function (e.g.
+ * "same as FL_DOWN_BOX, just with different insets"), matching how
+ * upstream's own Fl::set_boxtype() is commonly used. */
+Fl_Box_Draw_F *fl_box_fn(uchar boxtype);
+
+/* Registers a custom boxtype at slot `new_boxtype` (caller picks a
+ * number >= FL_FREE_BOXTYPE, matching upstream's Fl::set_boxtype()
+ * exactly) with the given draw function and insets. Once registered,
+ * `new_boxtype` behaves exactly like any builtin boxtype through
+ * fl_draw_box()/fl_box_dx()/etc. - no separate "is this custom"
+ * distinction anywhere else in the API. */
+void fl_set_boxtype(uchar new_boxtype, Fl_Box_Draw_F *fn, uchar dx, uchar dy, uchar dw, uchar dh);
+
 Fl_Color fl_box_color(Fl_Color c);   /* Fl::box_color(): dims c if the box being drawn is inactive_r() */
 void fl_set_box_color(Fl_Color c);   /* Fl::set_box_color(): fl_color(fl_box_color(c)) */
 void fl_set_box_drawing_active(int active); /* Fl::draw_box_active() backing store */
