@@ -131,6 +131,19 @@ void Fl_repeat_timeout(double seconds, Fl_Timeout_Handler *cb, void *data);
 void Fl_remove_timeout(Fl_Timeout_Handler *cb, void *data);
 int Fl_has_timeout(Fl_Timeout_Handler *cb, void *data);
 
+/* True idle callbacks, matching upstream's Fl::add_idle()/remove_idle():
+ * `cb` fires once per Fl_wait_for() iteration for as long as it stays
+ * registered, and - unlike a timeout - while any idle callback is
+ * registered, Fl_wait_for() never blocks waiting for the next event
+ * (clamped to a 0-second wait), so the event loop spins continuously
+ * calling idle callbacks whenever nothing else is pending. Adding the
+ * same (cb,data) pair twice is a no-op, matching upstream. Reuses
+ * Fl_Timeout_Handler's void(*)(void*) shape (upstream's own
+ * Fl_Idle_Handler has the same signature). */
+void Fl_add_idle(Fl_Timeout_Handler *cb, void *data);
+void Fl_remove_idle(Fl_Timeout_Handler *cb, void *data);
+int Fl_has_idle(Fl_Timeout_Handler *cb, void *data);
+
 /* -------------------------------------------------------------------
  * Focus / mouse-tracking widgets -- mirrors Fl::focus()/pushed()/
  * belowmouse(), split into getter/setter pairs since C has no overloading.

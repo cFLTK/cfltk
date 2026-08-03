@@ -161,6 +161,67 @@ static double process_timeouts(double requested_seconds) {
 }
 
 /* -------------------------------------------------------------------
+ * Idle callbacks
+ * ---------------------------------------------------------------- */
+
+#define CFLTK_MAX_IDLE 16
+
+typedef struct Fl_Idle_Slot {
+    Fl_Timeout_Handler *cb; /* same shape as a timeout handler: void(*)(void*) */
+    void *data;
+    int active;
+} Fl_Idle_Slot;
+
+static Fl_Idle_Slot g_idle[CFLTK_MAX_IDLE];
+static int g_idle_count = 0; /* number of active slots, kept in sync so Fl_wait_for()'s hot path is a single comparison */
+
+void Fl_add_idle(Fl_Timeout_Handler *cb, void *data) {
+    int i;
+    if (Fl_has_idle(cb, data)) return; /* matches upstream: adding twice is a no-op */
+    for (i = 0; i < CFLTK_MAX_IDLE; i++) {
+        if (!g_idle[i].active) {
+            g_idle[i].active = 1;
+            g_idle[i].cb = cb;
+            g_idle[i].data = data;
+            g_idle_count++;
+            return;
+        }
+    }
+    /* Pool exhausted: silently dropped, same policy as Fl_add_timeout(). */
+}
+
+void Fl_remove_idle(Fl_Timeout_Handler *cb, void *data) {
+    int i;
+    for (i = 0; i < CFLTK_MAX_IDLE; i++) {
+        if (g_idle[i].active && g_idle[i].cb == cb && g_idle[i].data == data) {
+            g_idle[i].active = 0;
+            g_idle_count--;
+        }
+    }
+}
+
+int Fl_has_idle(Fl_Timeout_Handler *cb, void *data) {
+    int i;
+    for (i = 0; i < CFLTK_MAX_IDLE; i++) {
+        if (g_idle[i].active && g_idle[i].cb == cb && g_idle[i].data == data) return 1;
+    }
+    return 0;
+}
+
+/* Calls every registered idle callback once. A callback that calls
+ * Fl_remove_idle() on itself (the common one-shot-idle pattern, e.g.
+ * dillo's own deferred-layout use) is safe: slots are snapshotted by
+ * index range before iterating, and removed slots are simply skipped,
+ * matching process_timeouts()'s same "deactivate before running"
+ * discipline against self-modification. */
+static void run_idle_callbacks(void) {
+    int i;
+    for (i = 0; i < CFLTK_MAX_IDLE; i++) {
+        if (g_idle[i].active) g_idle[i].cb(g_idle[i].data);
+    }
+}
+
+/* -------------------------------------------------------------------
  * Event state
  * ---------------------------------------------------------------- */
 
@@ -545,9 +606,13 @@ static void Fl_process_delete_queue(void) {
 }
 
 double Fl_wait_for(double seconds) {
-    double clamped = process_timeouts(seconds);
-    int got_event = fl_backend_wait(clamped);
+    double clamped;
+    int got_event;
+    if (g_idle_count > 0) seconds = 0.0; /* never block while idle work is pending */
+    clamped = process_timeouts(seconds);
+    got_event = fl_backend_wait(clamped);
     process_timeouts(0.0); /* fire anything whose deadline landed during the wait */
+    if (g_idle_count > 0) run_idle_callbacks();
     Fl_process_delete_queue();
     Fl_flush();
     return got_event ? 1.0 : 0.0;
