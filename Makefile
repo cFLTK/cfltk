@@ -101,6 +101,7 @@ CORE_SRCS := \
     src/draw/fl_symbols.c \
     src/draw/fl_colormap.c \
     src/dialogs/fl_ask.c \
+    src/dialogs/fl_file_chooser.c \
     src/valuators/Fl_Valuator.c \
     src/valuators/Fl_Slider.c \
     src/valuators/Fl_Fill_Slider.c \
