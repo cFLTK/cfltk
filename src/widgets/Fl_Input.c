@@ -545,7 +545,20 @@ static int handle_key(Fl_Input *self) {
             return 1;
         case FL_Enter:
         case FL_KP_Enter:
-            if (multiline && !readonly) { Fl_Input_replace(self, self->position_, self->mark_, "\n", 1); return 1; }
+            /* Matches upstream Fl_Input::handle_key()'s FL_Enter/FL_KP_Enter
+             * case: FL_WHEN_ENTER_KEY takes priority over multiline-newline
+             * insertion (checked first, regardless of multiline), calling
+             * position(size(),0) then maybe_do_callback() (do_callback()
+             * only if changed() or the _ALWAYS/_NOT_CHANGED bit is set). */
+            if (Fl_Widget_when(self_w) & FL_WHEN_ENTER_KEY) {
+                Fl_Input_set_position_mark(self, self->size_, 0);
+                if (Fl_Widget_changed(self_w) || (Fl_Widget_when(self_w) & FL_WHEN_NOT_CHANGED))
+                    Fl_Widget_do_callback(self_w);
+                return 1;
+            } else if (multiline && !readonly) {
+                Fl_Input_replace(self, self->position_, self->mark_, "\n", 1);
+                return 1;
+            }
             return 0;
         case FL_Tab:
             if (multiline && !self->tab_nav_ && !readonly) {
