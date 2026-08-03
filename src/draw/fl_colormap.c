@@ -81,8 +81,35 @@ const unsigned fl_colormap[256] = {
     0xff91ff00, 0xffb6ff00, 0xffdaff00, 0xffffff00
 };
 
+/* Runtime overrides for indexed colors 0-255, matching upstream's
+ * Fl::set_color()/get_color()/free_color() - fl_colormap[] itself
+ * stays const (a compiled-in default table, reproduced verbatim from
+ * upstream), this is a sparse override layer checked first. Index i
+ * is overridden iff g_color_override_set[i] is nonzero; the actual
+ * value lives in g_color_override[i], same packed (r<<24|g<<16|b<<8)
+ * layout as fl_colormap[] so fl_get_color_rgb() needs no branch for
+ * "is this overridden" beyond the one lookup. */
+static unsigned g_color_override[256];
+static unsigned char g_color_override_set[256];
+
+void Fl_set_color(Fl_Color c, uchar r, uchar g, uchar b) {
+    if (c > 255) return; /* direct RGB colors (fl_rgb_color()) aren't indexed - nothing to override */
+    g_color_override[c] = ((unsigned)r << 24) | ((unsigned)g << 16) | ((unsigned)b << 8);
+    g_color_override_set[c] = 1;
+}
+
+void Fl_free_color(Fl_Color c) {
+    if (c > 255) return;
+    g_color_override_set[c] = 0;
+}
+
 void fl_get_color_rgb(Fl_Color c, uchar *r, uchar *g, uchar *b) {
-    unsigned packed = (c <= 255) ? fl_colormap[c] : c;
+    unsigned packed;
+    if (c <= 255 && g_color_override_set[c]) {
+        packed = g_color_override[c];
+    } else {
+        packed = (c <= 255) ? fl_colormap[c] : c;
+    }
     *r = (uchar)(packed >> 24);
     *g = (uchar)(packed >> 16);
     *b = (uchar)(packed >> 8);
