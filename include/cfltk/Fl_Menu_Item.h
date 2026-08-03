@@ -160,6 +160,14 @@ const Fl_Menu_Item *Fl_Menu_Item_find_shortcut(const Fl_Menu_Item *self, int *in
 const Fl_Menu_Item *Fl_Menu_Item_popup(const Fl_Menu_Item *self, int x, int y,
                                         const Fl_Menu_ *owner, const Fl_Menu_Item *picked);
 
+/* Same as Fl_Menu_Item_popup(), plus an optional bold header line drawn
+ * above the menu (NULL for none) - matches upstream's popup(x, y,
+ * title, picked, p) title parameter, split into its own function since
+ * C has no default arguments. */
+const Fl_Menu_Item *Fl_Menu_Item_popup_with_title(const Fl_Menu_Item *self, int x, int y,
+                                                   const Fl_Menu_ *owner, const Fl_Menu_Item *picked,
+                                                   const char *title);
+
 /* Pops up a menu anchored to a rectangle (e.g. a button or menu bar
  * item): the first level drops down below (x,y,w,h) unless menubar is
  * set, in which case the first level is laid out horizontally across

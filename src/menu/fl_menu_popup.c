@@ -58,6 +58,14 @@ typedef struct MenuPopupState {
      * absolute (root) coordinates. The window is only ever grown to
      * this, never shrunk -- see recompute_window_bounds(). */
     int union_x, union_y, union_x2, union_y2;
+    /* Optional bold header line above level 0 (matches upstream's
+     * popup(x,y,title,...) parameter). Reserved as extra window-local
+     * space above levels[0]'s own y - see run()'s union_y adjustment
+     * and popup_draw()'s title strip - rather than touching levels[0]
+     * itself, so none of the row layout/hit-testing/drawing code above
+     * needs to know about it at all. */
+    const char *title;
+    int title_h;
 } MenuPopupState;
 
 static MenuPopupState g_menu;
@@ -298,6 +306,14 @@ static void popup_draw(Fl_Widget *self_w) {
      * masked here because draw_level() below always repaints the same
      * area using correctly window-relative coordinates. */
     fl_draw_box(FL_FLAT_BOX, 0, 0, self_w->w, self_w->h, style_bgcolor());
+    if (g_menu.title) {
+        /* Window-local y=0..title_h is exactly the space reserved
+         * above levels[0] in run() - see union_y's comment there. */
+        fl_draw_box(FL_UP_BOX, 0, 0, self_w->w, g_menu.title_h, style_bgcolor());
+        fl_font(FL_HELVETICA_BOLD, FL_NORMAL_SIZE);
+        fl_color(FL_FOREGROUND_COLOR);
+        fl_draw(g_menu.title, FL_MENU_COL_PAD / 2, fl_height() - fl_descent() + FL_MENU_ROW_PAD / 2);
+    }
     for (i = 0; i < g_menu.nlevels; i++) draw_level(&g_menu.levels[i]);
 }
 
@@ -430,12 +446,18 @@ static const Fl_WidgetOps popup_ops = {
  * ---------------------------------------------------------------- */
 
 static const Fl_Menu_Item *run(const Fl_Menu_Item *self, int x, int y, int w, int h,
-                                const Fl_Menu_ *owner, const Fl_Menu_Item *picked, int menubar) {
+                                const Fl_Menu_ *owner, const Fl_Menu_Item *picked, int menubar,
+                                const char *title) {
     int preselect = -1;
 
     memset(&g_menu, 0, sizeof(g_menu));
     g_menu.owner = owner;
     g_menu.active = 1;
+    g_menu.title = title;
+    if (title) {
+        fl_font(FL_HELVETICA_BOLD, FL_NORMAL_SIZE);
+        g_menu.title_h = fl_height() + 2 * FL_MENU_ROW_PAD;
+    }
 
     if (picked) {
         const Fl_Menu_Item *m;
@@ -452,14 +474,25 @@ static const Fl_Menu_Item *run(const Fl_Menu_Item *self, int x, int y, int w, in
     } else if (g_menu.levels[0].w < w) {
         g_menu.levels[0].w = w; /* pulldown at least as wide as its anchor button */
     }
+    if (title) {
+        int title_w;
+        fl_font(FL_HELVETICA_BOLD, FL_NORMAL_SIZE); /* layout_level() above left a different font current */
+        title_w = (int)fl_width(title, (int)strlen(title)) + FL_MENU_COL_PAD;
+        if (g_menu.levels[0].w < title_w) g_menu.levels[0].w = title_w; /* don't clip a wide title */
+    }
     g_menu.nlevels = 1;
 
+    /* Reserve title_h of extra window space above levels[0] - the
+     * level itself keeps its normal y, so none of the row hit-
+     * testing/drawing code needs to account for the title at all (see
+     * MenuPopupState.title_h's own comment). */
     g_menu.union_x = g_menu.levels[0].x;
-    g_menu.union_y = g_menu.levels[0].y;
+    g_menu.union_y = g_menu.levels[0].y - g_menu.title_h;
     g_menu.union_x2 = g_menu.levels[0].x + g_menu.levels[0].w;
     g_menu.union_y2 = g_menu.levels[0].y + g_menu.levels[0].h;
 
-    g_menu.win = Fl_Window_new(g_menu.levels[0].x, g_menu.levels[0].y, g_menu.levels[0].w, g_menu.levels[0].h, NULL);
+    g_menu.win = Fl_Window_new(g_menu.union_x, g_menu.union_y,
+                                g_menu.union_x2 - g_menu.union_x, g_menu.union_y2 - g_menu.union_y, NULL);
     Fl_Group_end(&g_menu.win->group);
     g_menu.win->group.widget.ops = &popup_ops;
     Fl_Window_set_border(g_menu.win, 0);
@@ -479,11 +512,17 @@ static const Fl_Menu_Item *run(const Fl_Menu_Item *self, int x, int y, int w, in
 
 const Fl_Menu_Item *Fl_Menu_Item_popup(const Fl_Menu_Item *self, int x, int y,
                                         const Fl_Menu_ *owner, const Fl_Menu_Item *picked) {
-    return run(self, x, y, 1, 1, owner, picked, 0);
+    return run(self, x, y, 1, 1, owner, picked, 0, NULL);
+}
+
+const Fl_Menu_Item *Fl_Menu_Item_popup_with_title(const Fl_Menu_Item *self, int x, int y,
+                                                   const Fl_Menu_ *owner, const Fl_Menu_Item *picked,
+                                                   const char *title) {
+    return run(self, x, y, 1, 1, owner, picked, 0, title);
 }
 
 const Fl_Menu_Item *Fl_Menu_Item_pulldown(const Fl_Menu_Item *self, int x, int y, int w, int h,
                                            const Fl_Menu_ *owner, const Fl_Menu_Item *picked, int menubar) {
-    if (menubar) return run(self, x, y, w, h, owner, picked, 1);
-    return run(self, x, y + h, w, 1, owner, picked, 0);
+    if (menubar) return run(self, x, y, w, h, owner, picked, 1, NULL);
+    return run(self, x, y + h, w, 1, owner, picked, 0, NULL);
 }
