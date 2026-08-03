@@ -294,6 +294,10 @@ void Fl_Widget_redraw_label(Fl_Widget *self) {
     else Fl_Widget_redraw(self);
 }
 
+void Fl_Widget_measure_label(const Fl_Widget *self, int *w, int *h) {
+    fl_label_measure(&self->label, w, h);
+}
+
 int Fl_Widget_contains(const Fl_Widget *self, const Fl_Widget *w) {
     while (w) {
         if (w == self) return 1;

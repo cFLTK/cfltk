@@ -345,6 +345,14 @@ void Fl_Widget_set_damage_area(Fl_Widget *self, uchar c, int x, int y, int w, in
 void Fl_Widget_redraw(Fl_Widget *self);
 void Fl_Widget_redraw_label(Fl_Widget *self);
 
+/* Measures this widget's own label (font/size/wrap already come from
+ * the label itself), matching upstream's protected
+ * Fl_Widget::measure_label(w,h). Equivalent to calling the free
+ * function fl_label_measure(&self->label, w, h) directly (see
+ * fl_draw.h) - this is just the instance-method spelling upstream
+ * code expects. */
+void Fl_Widget_measure_label(const Fl_Widget *self, int *w, int *h);
+
 /* -------------------------------------------------------------------
  * Tree navigation.
  * ---------------------------------------------------------------- */
