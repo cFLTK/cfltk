@@ -566,3 +566,9 @@ int Fl_run(void) {
     while (g_ctx.first_shown_window) Fl_wait_for(1e20);
     return 0;
 }
+
+#ifndef CFLTK_VERSION_STR
+#define CFLTK_VERSION_STR "0.0.0" /* fallback if built outside the Makefile's -D */
+#endif
+
+const char *Fl_api_version(void) { return CFLTK_VERSION_STR; }

@@ -168,6 +168,12 @@ void Fl_delete_widget(Fl_Widget *w);
 Fl_Window *Fl_first_window(void);
 Fl_Window *Fl_next_window(const Fl_Window *window);
 
+/* Returns cfltk's own version string (e.g. "0.1.0"), matching upstream
+ * FLTK's Fl::api_version() in spirit (a runtime-queryable version) -
+ * previously the only place cfltk's version was recorded anywhere was
+ * its pkg-config .pc file, unreachable at runtime. */
+const char *Fl_api_version(void);
+
 /* -------------------------------------------------------------------
  * Internal, cross-file API.
  *

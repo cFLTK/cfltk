@@ -3,6 +3,11 @@
 
 CFLTK_VERSION := 0.1.0
 
+# Baked into Fl.c's Fl_api_version() (see Fl.h) - single source of
+# truth, matches what gets written into the installed cfltk.pc's
+# Version field below.
+src/core/Fl.o: CFLAGS += -DCFLTK_VERSION_STR='"$(CFLTK_VERSION)"'
+
 # Install locations, GNU-style: override any of these, or just PREFIX,
 # e.g. `make install PREFIX=$HOME/.local` or `make install DESTDIR=/tmp/stage`
 # for a staged install (DESTDIR is prepended to every path below but,
