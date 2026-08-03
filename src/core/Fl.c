@@ -5,13 +5,19 @@
  * bookkeeping, the run/wait/flush loop, the shown-window list).
  */
 #ifndef _POSIX_C_SOURCE
-#define _POSIX_C_SOURCE 199309L /* clock_gettime()/CLOCK_MONOTONIC under strict -std=c99 */
+/* 200809L (POSIX.1-2008) rather than just 199309L: still covers
+ * clock_gettime()/CLOCK_MONOTONIC, and additionally exposes
+ * PTHREAD_MUTEX_RECURSIVE for Fl_lock()'s mutex under strict -std=c99. */
+#define _POSIX_C_SOURCE 200809L
 #endif
 
 #include <ctype.h>
+#include <fcntl.h>
+#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "cfltk/Fl.h"
 #include "cfltk/Fl_Window.h"
@@ -631,14 +637,216 @@ static void Fl_process_delete_queue(void) {
     g_delete_queue_count = 0;
 }
 
+/* -------------------------------------------------------------------
+ * Threading: Fl_lock()/Fl_unlock()/Fl_awake()/Fl_thread_message()
+ *
+ * Matches upstream's Fl::lock()/unlock()/awake()/thread_message() (and
+ * the Fl_Awake_Handler overload of awake(), split into Fl_awake_cb()
+ * here since C has no overloading). Reuses the fd-watch registry from
+ * Fl_add_fd() (already integrated into fl_backend_wait()'s select()
+ * call) for the wake side: a self-pipe whose read end is registered
+ * once, so a worker thread's Fl_awake()/Fl_awake_cb() interrupts a
+ * blocked Fl_wait_for() the same way any other watched fd would,
+ * rather than needing a second, backend-specific wake mechanism.
+ * ---------------------------------------------------------------- */
+
+#define CFLTK_MAX_AWAKE_MSGS 256
+#define CFLTK_MAX_AWAKE_CBS 64
+
+static pthread_mutex_t g_fl_mutex;
+static pthread_once_t g_fl_mutex_once = PTHREAD_ONCE_INIT;
+static int g_awake_pipe[2] = { -1, -1 };
+
+static void *g_awake_msgs[CFLTK_MAX_AWAKE_MSGS];
+static int g_awake_msg_head = 0, g_awake_msg_count = 0;
+
+typedef struct { void (*cb)(void *data); void *data; } Fl_Awake_Cb_Slot;
+static Fl_Awake_Cb_Slot g_awake_cbs[CFLTK_MAX_AWAKE_CBS];
+static int g_awake_cb_head = 0, g_awake_cb_count = 0;
+/* Fast-path hint checked every Fl_wait_for() call, so programs that
+ * never touch threading (dillo included - its own worker threads talk
+ * to the main thread over a plain fd, never call into cfltk directly)
+ * don't pay a mutex lock/unlock on every pass through the event loop.
+ * Plain `volatile` is not enough here (it blocks compiler reordering
+ * but is not a synchronization primitive - a worker thread's unlocked
+ * write and the main thread's unlocked read are still a data race
+ * under the C memory model, confirmed by ThreadSanitizer even though
+ * it's harmless in practice on x86); __atomic_* builtins (available
+ * under -std=c99 as compiler intrinsics, not libc) give a real,
+ * portable lock-free flag instead. Correctness never depends on this
+ * hint alone - every place that acts on it still takes g_fl_mutex
+ * before touching the actual queue, this only decides whether to
+ * bother locking at all. */
+static int g_awake_cb_pending = 0;
+
+static void init_fl_mutex(void) {
+    pthread_mutexattr_t attr;
+    pthread_mutexattr_init(&attr);
+    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+    pthread_mutex_init(&g_fl_mutex, &attr);
+    pthread_mutexattr_destroy(&attr);
+}
+
+static void ensure_awake_pipe(void);
+
+void Fl_lock(void) {
+    pthread_once(&g_fl_mutex_once, init_fl_mutex);
+    pthread_mutex_lock(&g_fl_mutex);
+    /* Eagerly create (though not yet fd-watch-register, still
+     * main-thread-only-safe, see register_awake_pipe_if_needed()) the
+     * awake pipe here too: if the caller follows upstream's documented
+     * "call Fl::lock() once from the main thread before starting any
+     * other threads" pattern, this makes even the very first
+     * Fl_awake()/Fl_awake_cb() call from a worker thread wake an
+     * already-blocked Fl_wait_for() immediately, with no first-call
+     * latency window. */
+    ensure_awake_pipe();
+}
+
+void Fl_unlock(void) {
+    pthread_once(&g_fl_mutex_once, init_fl_mutex);
+    pthread_mutex_unlock(&g_fl_mutex);
+}
+
+/* Drains whatever bytes woke the pipe; the actual queued messages/
+ * callbacks are handled separately (thread_message() polled by the
+ * app, awake callbacks run from Fl_wait_for() below) - this callback's
+ * only job is to make fl_backend_wait()'s select() return. */
+static void awake_pipe_cb(int fd, void *data) {
+    char buf[64];
+    (void)data;
+    while (read(fd, buf, sizeof(buf)) > 0) { }
+}
+
+/* Set once the pipe fds exist but before Fl_add_fd() has registered
+ * the read end - checked/cleared from Fl_wait_for() (main thread
+ * only, see below) so the actual Fl_add_fd() call, which mutates
+ * fl_x11_event.c's shared g_fds[] array with no locking of its own,
+ * never races against fl_backend_wait() concurrently reading that same
+ * array. Creating the pipe itself (plain syscalls, no shared cfltk
+ * state) is safe from any thread under the mutex; only the fd-watch
+ * registration needs to be pushed onto the main thread. __atomic_*
+ * builtins for the same reason as g_awake_cb_pending above - a plain
+ * unlocked int read/write here is a real data race under the C memory
+ * model (confirmed by ThreadSanitizer), even though correctness never
+ * depends on this flag alone (every reader still takes g_fl_mutex
+ * before acting on it being set). */
+static int g_awake_pipe_needs_registration = 0;
+
+static void ensure_awake_pipe(void) {
+    if (g_awake_pipe[0] != -1) return;
+    pthread_once(&g_fl_mutex_once, init_fl_mutex);
+    pthread_mutex_lock(&g_fl_mutex);
+    if (g_awake_pipe[0] == -1 && pipe(g_awake_pipe) == 0) {
+        fcntl(g_awake_pipe[0], F_SETFL, fcntl(g_awake_pipe[0], F_GETFL) | O_NONBLOCK);
+        fcntl(g_awake_pipe[1], F_SETFL, fcntl(g_awake_pipe[1], F_GETFL) | O_NONBLOCK);
+        __atomic_store_n(&g_awake_pipe_needs_registration, 1, __ATOMIC_RELEASE);
+    }
+    pthread_mutex_unlock(&g_fl_mutex);
+}
+
+/* Called from any thread (including the main one); wakes a blocked
+ * Fl_wait_for() so it notices the queued message/callback promptly
+ * instead of waiting out its full timeout. */
+static void wake_main_thread(void) {
+    ensure_awake_pipe();
+    if (g_awake_pipe[1] != -1) {
+        char c = 0;
+        ssize_t n = write(g_awake_pipe[1], &c, 1);
+        (void)n; /* a full pipe (already-pending wake) is not an error */
+    }
+}
+
+/* Main-thread-only: finishes registering the awake pipe with the
+ * fd-watch registry if a (possibly worker-thread) call to
+ * Fl_awake()/Fl_awake_cb() created it since the last pass. Must run
+ * before fl_backend_wait() so the very wait call that would otherwise
+ * block misses the wake is the one watching the pipe. */
+static void register_awake_pipe_if_needed(void) {
+    if (!__atomic_load_n(&g_awake_pipe_needs_registration, __ATOMIC_ACQUIRE)) return;
+    pthread_mutex_lock(&g_fl_mutex);
+    if (g_awake_pipe_needs_registration) {
+        Fl_add_fd(g_awake_pipe[0], FL_READ, awake_pipe_cb, NULL);
+        __atomic_store_n(&g_awake_pipe_needs_registration, 0, __ATOMIC_RELEASE);
+    }
+    pthread_mutex_unlock(&g_fl_mutex);
+}
+
+void Fl_awake(void *msg) {
+    pthread_once(&g_fl_mutex_once, init_fl_mutex);
+    pthread_mutex_lock(&g_fl_mutex);
+    if (g_awake_msg_count < CFLTK_MAX_AWAKE_MSGS) {
+        int tail = (g_awake_msg_head + g_awake_msg_count) % CFLTK_MAX_AWAKE_MSGS;
+        g_awake_msgs[tail] = msg;
+        g_awake_msg_count++;
+    }
+    pthread_mutex_unlock(&g_fl_mutex);
+    wake_main_thread();
+}
+
+void *Fl_thread_message(void) {
+    void *msg = NULL;
+    pthread_once(&g_fl_mutex_once, init_fl_mutex);
+    pthread_mutex_lock(&g_fl_mutex);
+    if (g_awake_msg_count > 0) {
+        msg = g_awake_msgs[g_awake_msg_head];
+        g_awake_msg_head = (g_awake_msg_head + 1) % CFLTK_MAX_AWAKE_MSGS;
+        g_awake_msg_count--;
+    }
+    pthread_mutex_unlock(&g_fl_mutex);
+    return msg;
+}
+
+int Fl_awake_cb(void (*cb)(void *data), void *data) {
+    int ok;
+    pthread_once(&g_fl_mutex_once, init_fl_mutex);
+    pthread_mutex_lock(&g_fl_mutex);
+    ok = (g_awake_cb_count < CFLTK_MAX_AWAKE_CBS);
+    if (ok) {
+        int tail = (g_awake_cb_head + g_awake_cb_count) % CFLTK_MAX_AWAKE_CBS;
+        g_awake_cbs[tail].cb = cb;
+        g_awake_cbs[tail].data = data;
+        g_awake_cb_count++;
+        __atomic_store_n(&g_awake_cb_pending, 1, __ATOMIC_RELEASE);
+    }
+    pthread_mutex_unlock(&g_fl_mutex);
+    wake_main_thread();
+    return ok ? 0 : -1; /* matches upstream: 0 on success, -1 if the queue is full */
+}
+
+/* Runs every queued Fl_awake_cb() callback on the main thread. Matches
+ * upstream: the callback-form of awake() is auto-dispatched by the
+ * event loop, unlike the plain-message form (Fl_thread_message()),
+ * which the app must poll for itself. */
+static void run_awake_callbacks(void) {
+    for (;;) {
+        void (*cb)(void *data);
+        void *data;
+        pthread_mutex_lock(&g_fl_mutex);
+        if (g_awake_cb_count == 0) {
+            __atomic_store_n(&g_awake_cb_pending, 0, __ATOMIC_RELEASE);
+            pthread_mutex_unlock(&g_fl_mutex);
+            return;
+        }
+        cb = g_awake_cbs[g_awake_cb_head].cb;
+        data = g_awake_cbs[g_awake_cb_head].data;
+        g_awake_cb_head = (g_awake_cb_head + 1) % CFLTK_MAX_AWAKE_CBS;
+        g_awake_cb_count--;
+        pthread_mutex_unlock(&g_fl_mutex);
+        cb(data);
+    }
+}
+
 double Fl_wait_for(double seconds) {
     double clamped;
     int got_event;
     if (g_idle_count > 0) seconds = 0.0; /* never block while idle work is pending */
+    register_awake_pipe_if_needed();
     clamped = process_timeouts(seconds);
     got_event = fl_backend_wait(clamped);
     process_timeouts(0.0); /* fire anything whose deadline landed during the wait */
     if (g_idle_count > 0) run_idle_callbacks();
+    if (__atomic_load_n(&g_awake_cb_pending, __ATOMIC_ACQUIRE)) run_awake_callbacks();
     Fl_process_delete_queue();
     Fl_flush();
     return got_event ? 1.0 : 0.0;

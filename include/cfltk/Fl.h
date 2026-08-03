@@ -165,6 +165,42 @@ void Fl_add_fd(int fd, int when, Fl_FD_Handler *cb, void *data);
 void Fl_remove_fd(int fd, int when);
 
 /* -------------------------------------------------------------------
+ * Threading -- matches upstream's Fl::lock()/unlock()/awake()/
+ * thread_message(), split into Fl_awake() (plain-message form) and
+ * Fl_awake_cb() (the Fl_Awake_Handler-callback overload) since C has
+ * no overloading. Safe to call from any thread; a worker thread should
+ * still call Fl_lock()/Fl_unlock() around any direct cfltk widget
+ * access (both Fl_awake() forms are already thread-safe on their own
+ * and don't need the lock just to queue a message/callback).
+ * ---------------------------------------------------------------- */
+
+/* Locks/unlocks a process-wide recursive mutex protecting cfltk's
+ * internal state. Lazily initialized on first use, so single-threaded
+ * programs (the common case - e.g. dillo, whose worker threads talk to
+ * the main thread over a plain watched fd and never call into cfltk
+ * directly) never pay for a mutex they don't use. */
+void Fl_lock(void);
+void Fl_unlock(void);
+
+/* Queues `msg` and wakes a blocked Fl_wait_for() on the main thread;
+ * the app retrieves queued messages itself via Fl_thread_message()
+ * (e.g. from an Fl_add_idle() callback) - matches upstream's plain
+ * Fl::awake(void*): the message is NOT auto-dispatched. Silently
+ * dropped if the queue is full (matches Fl_add_timeout()'s existing
+ * drop-on-exhaustion policy elsewhere in this header). */
+void Fl_awake(void *msg);
+/* Returns the next queued message (FIFO order), or NULL if none. */
+void *Fl_thread_message(void);
+
+/* Queues `cb` to run on the main thread (with `data`) and wakes a
+ * blocked Fl_wait_for() - matches upstream's Fl::awake(Fl_Awake_Handler,
+ * void*) overload: unlike Fl_awake() above, this IS auto-dispatched,
+ * once per Fl_wait_for() pass, before delete-queue draining. Returns 0
+ * on success, -1 if the callback queue is full (matches upstream's own
+ * return convention). */
+int Fl_awake_cb(void (*cb)(void *data), void *data);
+
+/* -------------------------------------------------------------------
  * Focus / mouse-tracking widgets -- mirrors Fl::focus()/pushed()/
  * belowmouse(), split into getter/setter pairs since C has no overloading.
  * ---------------------------------------------------------------- */
