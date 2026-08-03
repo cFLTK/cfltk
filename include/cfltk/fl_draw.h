@@ -15,8 +15,12 @@
  * Ownership       : the driver struct is backend-owned static storage;
  *                    cfltk never allocates or frees it.
  * Known differences:
- *   - No offscreen/print surfaces yet -- out of scope for the Linux
- *     reference backend's first pass. See docs/DESIGN.md.
+ *   - [FIXED] Off-screen drawing surfaces. Previously out of scope for
+ *     the Linux reference backend's first pass; now implemented (X11:
+ *     a Pixmap + its own GC/XftDraw pair, see
+ *     src/backend/x11/fl_x11_offscreen.c) as fl_create_offscreen()/
+ *     fl_delete_offscreen()/fl_begin_offscreen()/fl_end_offscreen()/
+ *     fl_copy_offscreen() below, matching upstream's API shape.
  *   - draw_image()/read_image() (added for Fl_RGB_Image) always blit
  *     straight to the current drawable -- there is no cached/offscreen
  *     image surface (upstream's per-image `id_`/`Fl_Offscreen` cache).
@@ -38,6 +42,13 @@ extern "C" {
 #endif
 
 typedef struct Fl_Region_ *Fl_Region;
+
+/* Opaque off-screen drawing surface (upstream: Fl_Offscreen, a raw
+ * Pixmap XID on X11; kept opaque here since the backend also needs a
+ * GC/XftDraw pair alongside the pixmap itself - see
+ * fl_x11_offscreen.c's `struct Fl_Offscreen_`). NULL is never a valid
+ * live offscreen, matching upstream's 0-is-invalid convention. */
+typedef struct Fl_Offscreen_ *Fl_Offscreen;
 
 typedef struct Fl_Graphics_Driver {
     void (*color_index)(Fl_Color c);
@@ -122,6 +133,22 @@ typedef struct Fl_Graphics_Driver {
      * (not inserted earlier) since every struct literal initializing
      * one of these is positional, not designated. */
     void (*text_extents)(const char *text, int n, int *dx, int *dy, int *w, int *h);
+
+    /* Off-screen drawing surface (matches upstream's
+     * fl_create_offscreen()/fl_delete_offscreen()/fl_begin_offscreen()/
+     * fl_end_offscreen()/fl_copy_offscreen()). begin_offscreen()
+     * redirects every draw_* call above into the surface instead of
+     * whatever window/surface was previously current, until the
+     * matching end_offscreen() - not reentrant, matching upstream (a
+     * second begin_offscreen() before the matching end_offscreen()
+     * clobbers the saved previous target, exactly like upstream's own
+     * single fl_window/gc save slot). Appended at the end of the
+     * vtable, same reason as text_extents above. */
+    Fl_Offscreen (*create_offscreen)(int w, int h);
+    void (*delete_offscreen)(Fl_Offscreen o);
+    void (*begin_offscreen)(Fl_Offscreen o);
+    void (*end_offscreen)(void);
+    void (*copy_offscreen)(int x, int y, int w, int h, Fl_Offscreen o, int srcx, int srcy);
 } Fl_Graphics_Driver;
 
 /* Installed by the platform backend before any drawing happens. */
@@ -276,6 +303,27 @@ static inline void fl_read_image(unsigned char *buf, int x, int y, int w, int h,
 }
 static inline void fl_draw_bitmask(const unsigned char *bits, int bmp_w, int bmp_h, int cx, int cy, int x, int y, int w, int h) {
     fl_graphics_driver()->draw_bitmask(bits, bmp_w, bmp_h, cx, cy, x, y, w, h);
+}
+
+/* ------------------------------------------------------------------ */
+/* Off-screen drawing surfaces (see Fl_Graphics_Driver's own doc       */
+/* comment above for the begin/end_offscreen non-reentrancy note).     */
+/* ------------------------------------------------------------------ */
+
+static inline Fl_Offscreen fl_create_offscreen(int w, int h) {
+    return fl_graphics_driver()->create_offscreen(w, h);
+}
+static inline void fl_delete_offscreen(Fl_Offscreen o) {
+    fl_graphics_driver()->delete_offscreen(o);
+}
+static inline void fl_begin_offscreen(Fl_Offscreen o) {
+    fl_graphics_driver()->begin_offscreen(o);
+}
+static inline void fl_end_offscreen(void) {
+    fl_graphics_driver()->end_offscreen();
+}
+static inline void fl_copy_offscreen(int x, int y, int w, int h, Fl_Offscreen o, int srcx, int srcy) {
+    fl_graphics_driver()->copy_offscreen(x, y, w, h, o, srcx, srcy);
 }
 
 /* ------------------------------------------------------------------ */

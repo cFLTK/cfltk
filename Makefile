@@ -132,7 +132,8 @@ CORE_SRCS := \
 X11_SRCS := \
     src/backend/x11/fl_x11_window.c \
     src/backend/x11/fl_x11_event.c \
-    src/backend/x11/fl_x11_driver.c
+    src/backend/x11/fl_x11_driver.c \
+    src/backend/x11/fl_x11_offscreen.c
 
 # Fl_PNG_Image/Fl_JPEG_Image are only compiled at all when their library
 # is found via pkg-config -- see include/cfltk/Fl_PNG_Image.h and

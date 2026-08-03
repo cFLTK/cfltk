@@ -542,7 +542,9 @@ static const Fl_Graphics_Driver g_driver = {
     d_draw_image, d_read_image,
     d_draw_bitmask,
     d_fill_polygon, d_draw_polyline,
-    d_text_extents
+    d_text_extents,
+    fl_x11_create_offscreen, fl_x11_delete_offscreen, fl_x11_begin_offscreen,
+    fl_x11_end_offscreen, fl_x11_copy_offscreen
 };
 
 const Fl_Graphics_Driver *fl_x11_graphics_driver(void) { return &g_driver; }

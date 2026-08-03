@@ -60,4 +60,12 @@ void fl_x11_driver_init(void);
 
 Fl_X11_Window *fl_x11_window_data(Fl_Window *win);
 
+/* fl_x11_offscreen.c -- see include/cfltk/fl_draw.h for the public
+ * fl_create_offscreen()/... wrappers these back. */
+Fl_Offscreen fl_x11_create_offscreen(int w, int h);
+void fl_x11_delete_offscreen(Fl_Offscreen o);
+void fl_x11_begin_offscreen(Fl_Offscreen o);
+void fl_x11_end_offscreen(void);
+void fl_x11_copy_offscreen(int x, int y, int w, int h, Fl_Offscreen o, int srcx, int srcy);
+
 #endif /* CFLTK_X11_INTERNAL_H */
