@@ -5,6 +5,8 @@
  * default, STRICT_RFC3629 off, matching upstream's own defaults) and the
  * fl_utf8len1 portion of src/fl_utf8.cxx.
  */
+#include <wctype.h>
+
 #include "cfltk/fl_utf8.h"
 
 int fl_utf8len1(char c) {
@@ -171,4 +173,24 @@ int fl_utf_nb_char(const unsigned char *str, int len) {
         if ((str[i] & 0xc0) != 0x80) n++;
     }
     return n;
+}
+
+static int utf_case_convert(const unsigned char *str, int len, char *buf, int to_upper) {
+    int in = 0, out = 0;
+    while (in < len) {
+        int dlen;
+        unsigned cp = fl_utf8decode((const char *)str + in, (const char *)str + len, &dlen);
+        unsigned mapped = to_upper ? (unsigned)towupper((wint_t)cp) : (unsigned)towlower((wint_t)cp);
+        out += fl_utf8encode(mapped, buf + out);
+        in += dlen;
+    }
+    return out;
+}
+
+int fl_utf_tolower(const unsigned char *str, int len, char *buf) {
+    return utf_case_convert(str, len, buf, 0);
+}
+
+int fl_utf_toupper(const unsigned char *str, int len, char *buf) {
+    return utf_case_convert(str, len, buf, 1);
 }

@@ -11,12 +11,13 @@
  *
  * Scope is deliberately narrow: byte-level UTF-8 correctness (decode/
  * encode/sequence-length), which is what Fl_Text_Buffer's position
- * bookkeeping actually depends on. fl_tolower()/fl_toupper() only
- * case-fold ASCII -- full Unicode case folding needs a large per-script
- * table (upstream's XUtf8Tolower()) this port does not carry; matches
- * the project's existing "ASCII-only" precedent for case-insensitive
- * operations. This only affects case-insensitive search matching
- * non-ASCII letters.
+ * bookkeeping actually depends on. fl_tolower()/fl_toupper() (single
+ * codepoint) only case-fold ASCII, kept that way deliberately (a
+ * guaranteed-locale-independent fast path with no per-script table);
+ * fl_utf_tolower()/fl_utf_toupper() (whole strings, added later - see
+ * their own doc comments below) case-fold via the C library's
+ * towlower()/towupper() instead, for callers that want real Unicode
+ * case conversion and can accept it being locale-dependent.
  *
  * Known differences: no fl_utf8toUtf16()/fl_utf8fromUtf16() (Windows-only
  * upstream, irrelevant to the X11/NuttX targets this port cares about),
@@ -62,6 +63,22 @@ int fl_utf8test(const char *src, unsigned int srclen);
 /* Counts the number of UTF-8 characters (i.e. non-continuation bytes)
  * in the first len bytes of str. */
 int fl_utf_nb_char(const unsigned char *str, int len);
+
+/* Case-converts the first len bytes of str (UTF-8) into buf (caller-
+ * allocated, must have room for up to 4 bytes per input character -
+ * worst case, every character's case mapping happens to encode longer
+ * than the original), returning the number of bytes written. Unlike
+ * fl_tolower()/fl_toupper() above (deliberately ASCII-only, see this
+ * header's own note), these go through the C library's towlower()/
+ * towupper() per decoded codepoint, so correctness for non-ASCII
+ * scripts depends on the process's locale being UTF-8-aware (LC_CTYPE
+ * set via setlocale(), typically already the case on modern Linux via
+ * the environment's LANG/LC_ALL - cfltk does not call setlocale()
+ * itself, that's an application-level decision). Falls back to
+ * leaving a character unchanged if the "C" locale's tables don't know
+ * its case mapping, same as towlower()/towupper() themselves do. */
+int fl_utf_tolower(const unsigned char *str, int len, char *buf);
+int fl_utf_toupper(const unsigned char *str, int len, char *buf);
 
 #ifdef __cplusplus
 }
