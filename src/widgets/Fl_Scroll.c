@@ -242,6 +242,10 @@ static void draw_clip(Fl_Scroll *self, int X, int Y, int W, int H) {
     fl_pop_clip();
 }
 
+static void scroll_draw_area_cb(void *data, int x, int y, int w, int h) {
+    draw_clip((Fl_Scroll *)data, x, y, w, h);
+}
+
 void Fl_Scroll_draw(Fl_Widget *self_w) {
     Fl_Scroll *self = (Fl_Scroll *)self_w;
     Fl_Group *g = &self->group;
@@ -261,9 +265,15 @@ void Fl_Scroll_draw(Fl_Widget *self_w) {
         draw_clip(self, X, Y, W, H);
     } else {
         if (d & FL_DAMAGE_SCROLL) {
-            /* No fl_scroll() blit primitive (see header); redraw the
-             * whole visible area instead of just the exposed strip. */
-            draw_clip(self, X, Y, W, H);
+            /* [FIXED - see header] Blits the already-correct pixels by
+             * the amount scrolled and redraws only the newly-exposed
+             * strip, via cfltk's new fl_scroll() (commit 166e90e).
+             * self->oldx/oldy hold the position last drawn (frozen
+             * until updated below); self->xposition_/yposition_ hold
+             * the current target (children were already repositioned
+             * by scroll_to()/Fl_Scroll_resize() before this draw). */
+            fl_scroll(X, Y, W, H, self->oldx - self->xposition_,
+                      self->oldy - self->yposition_, scroll_draw_area_cb, self);
         }
         if (d & FL_DAMAGE_CHILD) {
             int nc = Fl_Group_children(g);

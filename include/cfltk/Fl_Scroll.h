@@ -36,11 +36,11 @@
  *                    content children owned exactly like any other
  *                    Fl_Group.
  * Known differences:
- *   - No accelerated "shift already-drawn pixels, redraw only the newly
- *     exposed strip" blit (upstream's fl_scroll(), backed by a
- *     platform-specific copy-area primitive cfltk hasn't ported).
- *     FL_DAMAGE_SCROLL just redraws the whole visible content area
- *     instead -- same pixels end up on screen, less efficient.
+ *   - [FIXED] Accelerated "shift already-drawn pixels, redraw only the
+ *     newly exposed strip" blit on scroll. cfltk previously had no
+ *     fl_scroll() at all; now implemented (commit 166e90e) and used by
+ *     FL_DAMAGE_SCROLL below instead of redrawing the whole visible
+ *     content area every time.
  *   - No color-scheme tiled background (`Fl::scheme_bg_`) -- see the
  *     project-wide "no color schemes" note in docs/DESIGN.md; the
  *     content area is always filled with color() before drawing
