@@ -105,6 +105,17 @@ static inline void Fl_Window_clear_border(Fl_Window *self) {
     self->group.widget.flags |= FL_WIDGET_NOBORDER;
 }
 
+/* Named to match upstream's Fl_Window::set_override() - functionally
+ * identical to Fl_Window_set_border(self, 0) here, not a separate
+ * mechanism: the X11 backend already sets real override-redirect
+ * (XSetWindowAttributes.override_redirect, so the window manager never
+ * decorates/reparents the window) for any window with its border
+ * cleared, at window-creation time (fl_x11_window.c's
+ * fl_backend_window_create()). Call before Fl_Widget_show(). */
+static inline void Fl_Window_set_override(Fl_Window *self) {
+    Fl_Window_set_border(self, 0);
+}
+
 /* Marks the window (and, transitively, everything inside it) as needing
  * a redraw and a fresh backend blit on the next flush. */
 void Fl_Window_flush(Fl_Window *self);
