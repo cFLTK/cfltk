@@ -490,11 +490,23 @@ static int strip_shortcut_marker(const char *in, char *out, int outcap, int *und
  * *text_out points into buf (possibly past a consumed leading symbol,
  * and NUL-truncated before a trailing one). Adjusts *underline (from
  * strip_shortcut_marker) if it fell inside consumed/removed text. */
+/* When set, extract_symbols() below never recognizes a '@symbol' at
+ * all (the whole string is left as plain text) - analogous to
+ * fl_draw_shortcut's existing control over '&' mnemonic handling.
+ * Meant to be toggled around a fl_label_draw_default()/
+ * fl_label_measure_default() call from inside a custom labeltype
+ * handler registered via Fl_set_labeltype() that wants the normal
+ * layout/rendering but with untrusted label text never triggering
+ * '@'-symbol-glyph substitution (the actual real-world need this was
+ * added for - see Fl_set_labeltype()'s own doc comment). */
+int fl_label_no_symbols = 0;
+
 static void extract_symbols(char *buf, char **text_out, char *sym0, size_t sym0cap,
                              char *sym1, size_t sym1cap, int *underline) {
     char *p = buf;
     sym0[0] = '\0';
     sym1[0] = '\0';
+    if (fl_label_no_symbols) { *text_out = buf; return; }
     if (p[0] == '@' && p[1] && p[1] != '@') {
         char *s = sym0;
         char *q = p;
@@ -566,7 +578,7 @@ void fl_measure(const char *str, int *w, int *h, int draw_symbols) {
     *h = nlines * lh;
 }
 
-void fl_label_measure(const Fl_Label *label, int *w, int *h) {
+void fl_label_measure_default(const Fl_Label *label, int *w, int *h) {
     char buf[512], sym0[64], sym1[64], *text;
     int underline = -1;
     int symw0 = 0, symw1 = 0, lw = 0, lh = 0;
@@ -604,7 +616,7 @@ void fl_label_measure(const Fl_Label *label, int *w, int *h) {
  * image+text layout, no multi-line wrap (pre-existing text-only
  * limitation, unchanged) -- so a symbol is only ever recognized at the
  * very start/end of the whole (single-line) label, not per-line. */
-void fl_label_draw(const Fl_Label *label, int x, int y, int w, int h, Fl_Align align) {
+void fl_label_draw_default(const Fl_Label *label, int x, int y, int w, int h, Fl_Align align) {
     int lw = 0, lh = 0, lx = 0, ly, underline = -1, dn = 0, baseline;
     int imgw = 0, imgh = 0, total_h, top;
     int symw0 = 0, symw1 = 0;
@@ -686,4 +698,33 @@ void fl_label_draw(const Fl_Label *label, int x, int y, int w, int h, Fl_Align a
     }
 
     if (align & FL_ALIGN_CLIP) fl_pop_clip();
+}
+
+/* Pluggable labeltype registry - see fl_draw.h's own doc comment on
+ * Fl_set_labeltype(). A plain 256-entry sparse table (any uchar
+ * labeltype, not just >=FL_FREE_LABELTYPE, can be overridden - most
+ * notably FL_NORMAL_LABEL itself, upstream's own most common use). */
+typedef struct { Fl_Label_Draw_F *draw; Fl_Label_Measure_F *measure; int active; } LabelTypeEntry;
+static LabelTypeEntry g_labeltypes[256];
+
+void Fl_set_labeltype(uchar type, Fl_Label_Draw_F *draw, Fl_Label_Measure_F *measure) {
+    g_labeltypes[type].draw = draw;
+    g_labeltypes[type].measure = measure;
+    g_labeltypes[type].active = 1;
+}
+
+void fl_label_measure(const Fl_Label *label, int *w, int *h) {
+    if (g_labeltypes[label->type].active && g_labeltypes[label->type].measure) {
+        g_labeltypes[label->type].measure(label, w, h);
+        return;
+    }
+    fl_label_measure_default(label, w, h);
+}
+
+void fl_label_draw(const Fl_Label *label, int x, int y, int w, int h, Fl_Align align) {
+    if (g_labeltypes[label->type].active && g_labeltypes[label->type].draw) {
+        g_labeltypes[label->type].draw(label, x, y, w, h, align);
+        return;
+    }
+    fl_label_draw_default(label, x, y, w, h, align);
 }

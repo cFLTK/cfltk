@@ -383,6 +383,38 @@ extern int fl_draw_shortcut;
 void fl_label_draw(const Fl_Label *label, int x, int y, int w, int h, Fl_Align align);
 void fl_label_measure(const Fl_Label *label, int *w, int *h);
 
+/* Pluggable labeltype registry, matching upstream's Fl::set_labeltype().
+ * fl_label_draw()/fl_label_measure() check this registry first (for
+ * *any* label->type value, including builtin ones like FL_NORMAL_LABEL
+ * - upstream's own most common use is overriding FL_NORMAL_LABEL
+ * itself process-wide, e.g. to suppress '@'-symbol-glyph substitution
+ * for untrusted label text); an unregistered type falls through to the
+ * existing built-in behavior (previously the *only* behavior, since
+ * cfltk had no registry at all before this). Registering
+ * FL_FREE_LABELTYPE or above defines a genuinely new labeltype, same
+ * as upstream. */
+typedef void (Fl_Label_Draw_F)(const Fl_Label *label, int x, int y, int w, int h, Fl_Align align);
+typedef void (Fl_Label_Measure_F)(const Fl_Label *label, int *w, int *h);
+void Fl_set_labeltype(uchar type, Fl_Label_Draw_F *draw, Fl_Label_Measure_F *measure);
+
+/* The built-in draw/measure behavior fl_label_draw()/fl_label_measure()
+ * themselves fall back to for any unregistered labeltype - exposed
+ * publicly so a custom handler registered via Fl_set_labeltype() can
+ * call through to it (e.g. wrapped with fl_label_no_symbols below)
+ * instead of having to reimplement label layout from scratch. */
+void fl_label_draw_default(const Fl_Label *label, int x, int y, int w, int h, Fl_Align align);
+void fl_label_measure_default(const Fl_Label *label, int *w, int *h);
+
+/* When set, fl_label_draw_default()/fl_label_measure_default() never
+ * recognize a leading/trailing '@symbol' at all - the whole label is
+ * always drawn as plain text. Analogous to fl_draw_shortcut's existing
+ * control over '&' mnemonic handling. Meant to be toggled around a
+ * call from inside a custom labeltype handler that wants normal label
+ * layout/rendering but with untrusted text never triggering FLTK's
+ * '@'-symbol-glyph substitution - the real-world need
+ * Fl_set_labeltype() itself was added for. */
+extern int fl_label_no_symbols;
+
 #ifdef __cplusplus
 }
 #endif
