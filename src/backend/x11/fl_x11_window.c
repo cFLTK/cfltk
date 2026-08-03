@@ -6,6 +6,9 @@
  * window. Translated in spirit from src/Fl_x.cxx (Fl_X::make /
  * Fl_Window::show / Fl_Window::flush for the X11 platform).
  */
+#ifndef _DEFAULT_SOURCE
+#define _DEFAULT_SOURCE /* strdup() under strict -std=c99 */
+#endif
 #include <stdlib.h>
 #include <string.h>
 
@@ -23,6 +26,14 @@ Window fl_x11_root = 0;
 Atom fl_x11_wm_delete_window = 0;
 
 static int g_initialized = 0;
+static char *g_default_xclass = NULL;
+
+void Fl_Window_default_xclass(const char *xc) {
+    free(g_default_xclass);
+    g_default_xclass = xc ? strdup(xc) : NULL;
+}
+
+const char *Fl_Window_default_xclass_get(void) { return g_default_xclass; }
 
 int fl_backend_init(void) {
     if (g_initialized) return 1;
@@ -94,6 +105,18 @@ void fl_backend_window_create(Fl_Window *win) {
     {
         const char *label = Fl_Window_label(win);
         if (label) XStoreName(fl_x11_display, xw->real_xid, label);
+    }
+
+    if (g_default_xclass) {
+        /* WM_CLASS carries both an instance name and a class name;
+         * matches upstream's own Fl_X::make_xid() (duplicates the same
+         * xclass string into both slots via XChangeProperty on
+         * XA_WM_CLASS) rather than trying to derive a separate
+         * instance name from argv[0]. */
+        XClassHint hint;
+        hint.res_name = g_default_xclass;
+        hint.res_class = g_default_xclass;
+        XSetClassHint(fl_x11_display, xw->real_xid, &hint);
     }
 
     if (!Fl_Window_border(win)) {

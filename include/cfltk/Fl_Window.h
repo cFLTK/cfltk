@@ -20,8 +20,9 @@
  *   - No multi-platform Fl_X abstraction; window <-> platform-handle
  *     mapping goes through backend_data (opaque, backend-owned) instead
  *     of a shared native-handle table (see src/backend/fl_backend.h).
- *   - fullscreen(), icon(), xclass(), size_range(), hotspot() are not
- *     implemented yet; see docs/DESIGN.md.
+ *   - fullscreen(), icon() are not implemented yet; see docs/DESIGN.md.
+ *     xclass()/default_xclass() and size_range() are now implemented
+ *     (Fl_Window_default_xclass(), Fl_Window_set_size_range()).
  */
 #ifndef CFLTK_FL_WINDOW_H
 #define CFLTK_FL_WINDOW_H
@@ -103,6 +104,16 @@ void Fl_Window_flush(Fl_Window *self);
  * cursor on yet) - matches upstream's own documented behavior of
  * silently doing nothing before show(). */
 void Fl_Window_set_cursor(Fl_Window *self, Fl_Cursor c);
+
+/* Sets the process-wide default X11 WM_CLASS hint (both the instance
+ * and class name slots, matching upstream FLTK's own Fl_X::make_xid(),
+ * which duplicates the same xclass string into both) applied to every
+ * window created after this call - matches upstream's
+ * Fl_Window::default_xclass(const char*) (a static/global setting, not
+ * per-window). Affects window-manager taskbar/icon grouping only. Call
+ * before creating any windows for it to take effect on all of them. */
+void Fl_Window_default_xclass(const char *xclass);
+const char *Fl_Window_default_xclass_get(void);
 
 /* Positions the window so that its own point (X,Y) lands at the
  * current (live-queried) mouse position, clamped to stay fully
