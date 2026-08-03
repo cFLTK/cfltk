@@ -133,6 +133,16 @@ void fl_backend_window_create(Fl_Window *win) {
         XSizeHints hints;
         hints.flags = PPosition | PSize;
         hints.x = x; hints.y = y; hints.width = width; hints.height = height;
+        if (win->min_w > 0 || win->min_h > 0) {
+            hints.flags |= PMinSize;
+            hints.min_width = win->min_w > 0 ? win->min_w : 1;
+            hints.min_height = win->min_h > 0 ? win->min_h : 1;
+        }
+        if (win->max_w > 0 || win->max_h > 0) {
+            hints.flags |= PMaxSize;
+            hints.max_width = win->max_w > 0 ? win->max_w : 32767;
+            hints.max_height = win->max_h > 0 ? win->max_h : 32767;
+        }
         XSetWMNormalHints(fl_x11_display, xw->real_xid, &hints);
     }
 
@@ -203,6 +213,24 @@ void fl_backend_window_relabel(Fl_Window *win) {
     if (label) XStoreName(fl_x11_display, xw->real_xid, label);
     icon_label = Fl_Window_icon_label(win);
     if (icon_label) XSetIconName(fl_x11_display, xw->real_xid, icon_label);
+}
+
+void fl_backend_window_resize_hints(Fl_Window *win) {
+    Fl_X11_Window *xw = fl_x11_window_data(win);
+    XSizeHints hints;
+    if (!xw) return;
+    memset(&hints, 0, sizeof(hints));
+    if (win->min_w > 0 || win->min_h > 0) {
+        hints.flags |= PMinSize;
+        hints.min_width = win->min_w > 0 ? win->min_w : 1;
+        hints.min_height = win->min_h > 0 ? win->min_h : 1;
+    }
+    if (win->max_w > 0 || win->max_h > 0) {
+        hints.flags |= PMaxSize;
+        hints.max_width = win->max_w > 0 ? win->max_w : 32767;
+        hints.max_height = win->max_h > 0 ? win->max_h : 32767;
+    }
+    XSetWMNormalHints(fl_x11_display, xw->real_xid, &hints);
 }
 
 void fl_backend_window_destroy(Fl_Window *win) {

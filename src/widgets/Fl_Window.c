@@ -52,6 +52,7 @@ void Fl_Window_init(Fl_Window *self, int x, int y, int w, int h, const char *lab
     self->shown = 0;
     self->next_shown = NULL;
     self->double_buffered = 0;
+    self->min_w = self->min_h = self->max_w = self->max_h = 0;
 
     /* Fl_Group_init() already called begin() on this window, matching
      * upstream: the constructor opens the group for adding children, but
@@ -149,6 +150,14 @@ void Fl_Window_set_icon_label(Fl_Window *self, const char *text) {
         memcpy(self->icon_label_copy, text, strlen(text) + 1);
     }
     if (self->shown) fl_backend_window_relabel(self);
+}
+
+void Fl_Window_set_size_range(Fl_Window *self, int minw, int minh, int maxw, int maxh) {
+    self->min_w = minw;
+    self->min_h = minh;
+    self->max_w = maxw;
+    self->max_h = maxh;
+    if (self->shown) fl_backend_window_resize_hints(self);
 }
 
 void Fl_Window_set_border(Fl_Window *self, int b) {

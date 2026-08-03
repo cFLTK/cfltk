@@ -39,6 +39,12 @@ void fl_backend_window_reshape(Fl_Window *win);
  * fl_backend_window_create()). */
 void fl_backend_window_relabel(Fl_Window *win);
 
+/* Re-applies WM_NORMAL_HINTS' PMinSize/PMaxSize from Fl_Window's
+ * min_w/min_h/max_w/max_h after Fl_Window_set_size_range() changed
+ * them post-show(). No-op if the window isn't shown yet (the initial
+ * values get applied once at window-creation time instead). */
+void fl_backend_window_resize_hints(Fl_Window *win);
+
 /* Blits/exposes whatever cfltk drew into the window's damaged area. */
 void fl_backend_window_flush(Fl_Window *win);
 

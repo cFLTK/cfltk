@@ -50,6 +50,13 @@ struct Fl_Window {
      * fl_backend_window_create() time to decide whether to allocate an
      * offscreen draw buffer. See Fl_Double_Window.h. */
     int double_buffered;
+
+    /* Set by Fl_Window_set_size_range() (0 = unset/no constraint in
+     * that direction, matching upstream's default). Applied as
+     * WM_NORMAL_HINTS min/max size at window-creation time, or
+     * immediately via fl_backend_window_relabel()-style live update if
+     * the window is already shown when set. */
+    int min_w, min_h, max_w, max_h;
 };
 
 extern const Fl_WidgetOps fl_window_ops;
@@ -96,6 +103,14 @@ void Fl_Window_set_icon_label(Fl_Window *self, const char *text);
 static inline const char *Fl_Window_icon_label(const Fl_Window *self) {
     return self->icon_label_copy ? self->icon_label_copy : Fl_Window_label(self);
 }
+
+/* Sets the window's min/max resizable bounds (X11: WM_NORMAL_HINTS'
+ * PMinSize/PMaxSize), matching upstream's
+ * Fl_Window::size_range(minw,minh,maxw,maxh). 0 means "no constraint
+ * in that direction", matching upstream's default. Applied immediately
+ * if the window is already shown, otherwise takes effect at the next
+ * show(). */
+void Fl_Window_set_size_range(Fl_Window *self, int minw, int minh, int maxw, int maxh);
 
 static inline unsigned int Fl_Window_border(const Fl_Window *self) {
     return !(self->group.widget.flags & FL_WIDGET_NOBORDER);
