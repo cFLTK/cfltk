@@ -65,6 +65,13 @@ void fl_backend_ungrab(void);
  * screen. */
 void fl_backend_screen_size(int *w, int *h);
 
+/* Real physical DPI, computed from the X server's reported screen size
+ * in millimeters (DisplayWidthMM/HeightMM) - falls back to 96.0 (the
+ * common assumed default) if the display isn't open yet or reports a
+ * zero physical size (some virtual/nested X servers, e.g. Xvfb without
+ * -dpi, do this). */
+void fl_backend_screen_dpi(float *dpi_x, float *dpi_y);
+
 /* Live pointer position in root/screen coordinates (X11: XQueryPointer
  * on the root window), independent of the last dispatched event --
  * needed by Fl_Window_hotspot() to center a not-yet-shown dialog under

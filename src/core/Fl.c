@@ -232,6 +232,10 @@ void Fl_screen_xywh(int *x, int *y, int *w, int *h) {
     fl_backend_screen_size(w, h);
 }
 
+void Fl_screen_dpi(float *dpi_x, float *dpi_y) {
+    fl_backend_screen_dpi(dpi_x, dpi_y);
+}
+
 /* -------------------------------------------------------------------
  * Clipboard (in-process only, see Fl.h)
  * ---------------------------------------------------------------- */

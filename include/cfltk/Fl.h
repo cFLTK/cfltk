@@ -88,6 +88,11 @@ void Fl_get_mouse(int *x_root, int *y_root);
 void Fl_screen_xywh(int *x, int *y, int *w, int *h);
 static inline void Fl_screen_work_area(int *x, int *y, int *w, int *h) { Fl_screen_xywh(x, y, w, h); }
 
+/* Real physical screen DPI (X11: computed from DisplayWidthMM/HeightMM),
+ * matching upstream's Fl::screen_dpi(h, v). Falls back to 96.0 if the
+ * display reports a zero physical size. */
+void Fl_screen_dpi(float *dpi_x, float *dpi_y);
+
 /* -------------------------------------------------------------------
  * Clipboard -- mirrors Fl::copy()/Fl::paste(), restricted to an
  * in-process buffer (clipboard 0 = mouse/PRIMARY-style selection,

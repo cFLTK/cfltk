@@ -265,6 +265,18 @@ void fl_backend_ungrab(void) {
     XUngrabKeyboard(fl_x11_display, CurrentTime);
 }
 
+void fl_backend_screen_dpi(float *dpi_x, float *dpi_y) {
+    int wmm = 0, hmm = 0, wpx = 0, hpx = 0;
+    if (fl_x11_display) {
+        wpx = DisplayWidth(fl_x11_display, fl_x11_screen);
+        hpx = DisplayHeight(fl_x11_display, fl_x11_screen);
+        wmm = DisplayWidthMM(fl_x11_display, fl_x11_screen);
+        hmm = DisplayHeightMM(fl_x11_display, fl_x11_screen);
+    }
+    *dpi_x = (wmm > 0) ? (float)wpx * 25.4f / (float)wmm : 96.0f;
+    *dpi_y = (hmm > 0) ? (float)hpx * 25.4f / (float)hmm : 96.0f;
+}
+
 void fl_backend_screen_size(int *w, int *h) {
     if (fl_x11_display) {
         *w = DisplayWidth(fl_x11_display, fl_x11_screen);
