@@ -415,6 +415,13 @@ static void d_text_extents(const char *text, int n, int *dx, int *dy, int *w, in
     *h = (int)extents.height;
 }
 
+static void d_scroll_blit(int src_x, int src_y, int src_w, int src_h, int dest_x, int dest_y) {
+    if (!fl_x11_current_target || src_w <= 0 || src_h <= 0) return;
+    XCopyArea(fl_x11_display, fl_x11_current_target->xid, fl_x11_current_target->xid,
+              fl_x11_current_target->gc, src_x, src_y, (unsigned)src_w, (unsigned)src_h,
+              dest_x, dest_y);
+}
+
 /* ------------------------------------------------------------------ */
 /* Raw image blit/read-back                                            */
 /*                                                                      */
@@ -544,7 +551,8 @@ static const Fl_Graphics_Driver g_driver = {
     d_fill_polygon, d_draw_polyline,
     d_text_extents,
     fl_x11_create_offscreen, fl_x11_delete_offscreen, fl_x11_begin_offscreen,
-    fl_x11_end_offscreen, fl_x11_copy_offscreen
+    fl_x11_end_offscreen, fl_x11_copy_offscreen,
+    d_scroll_blit
 };
 
 const Fl_Graphics_Driver *fl_x11_graphics_driver(void) { return &g_driver; }

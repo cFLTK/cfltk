@@ -728,3 +728,34 @@ void fl_label_draw(const Fl_Label *label, int x, int y, int w, int h, Fl_Align a
     }
     fl_label_draw_default(label, x, y, w, h, align);
 }
+
+int fl_scroll(int X, int Y, int W, int H, int dx, int dy,
+              void (*draw_area)(void *data, int x, int y, int w, int h), void *data) {
+    int src_x, src_w, dest_x;
+    int src_y, src_h, dest_y;
+
+    if (dx == 0 && dy == 0) return 1;
+
+    if (dx <= -W || dx >= W || dy <= -H || dy >= H) {
+        draw_area(data, X, Y, W, H);
+        return 0;
+    }
+
+    if (dx > 0) { src_x = X;      dest_x = X + dx; src_w = W - dx; }
+    else        { src_x = X - dx; dest_x = X;      src_w = W + dx; }
+    if (dy > 0) { src_y = Y;      dest_y = Y + dy; src_h = H - dy; }
+    else        { src_y = Y - dy; dest_y = Y;      src_h = H + dy; }
+
+    fl_graphics_driver()->scroll_blit(src_x, src_y, src_w, src_h, dest_x, dest_y);
+
+    /* The vertical strip covers the full H (including where the
+     * horizontal strip's row would otherwise overlap it), so the
+     * horizontal strip only spans src_w - avoids drawing the corner
+     * twice while still covering the whole exposed L-shape. */
+    if (dx > 0) draw_area(data, X, Y, dx, H);
+    else if (dx < 0) draw_area(data, X + W + dx, Y, -dx, H);
+    if (dy > 0) draw_area(data, dest_x, Y, src_w, dy);
+    else if (dy < 0) draw_area(data, dest_x, Y + H + dy, src_w, -dy);
+
+    return 1;
+}

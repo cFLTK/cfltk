@@ -149,6 +149,12 @@ typedef struct Fl_Graphics_Driver {
     void (*begin_offscreen)(Fl_Offscreen o);
     void (*end_offscreen)(void);
     void (*copy_offscreen)(int x, int y, int w, int h, Fl_Offscreen o, int srcx, int srcy);
+
+    /* Same-drawable rectangle copy backing fl_scroll() below (upstream:
+     * a thin platform-specific "copy area" primitive, X11: XCopyArea()
+     * of the current target onto itself). Appended at the end, same
+     * reason as text_extents/create_offscreen above. */
+    void (*scroll_blit)(int src_x, int src_y, int src_w, int src_h, int dest_x, int dest_y);
 } Fl_Graphics_Driver;
 
 /* Installed by the platform backend before any drawing happens. */
@@ -325,6 +331,25 @@ static inline void fl_end_offscreen(void) {
 static inline void fl_copy_offscreen(int x, int y, int w, int h, Fl_Offscreen o, int srcx, int srcy) {
     fl_graphics_driver()->copy_offscreen(x, y, w, h, o, srcx, srcy);
 }
+
+/* ------------------------------------------------------------------ */
+/* Scrolling (matches upstream's fl_scroll()).                         */
+/* ------------------------------------------------------------------ */
+
+/* Shifts the already-drawn pixels in [X,Y,W,H] by (dx,dy) with a
+ * single same-drawable copy, then calls draw_area(data, x,y,w,h) once
+ * per newly-exposed strip (at most two calls: one vertical, one
+ * horizontal, covering the L-shaped region the shift left blank) -
+ * instead of redrawing the whole [X,Y,W,H] rect from scratch on every
+ * scroll step. Falls back to a single whole-rect draw_area() call (and
+ * returns 0) when |dx|>=W or |dy|>=H, since then nothing already drawn
+ * remains on screen to shift. Matches upstream's fl_scroll() exactly,
+ * including its "just shift the pixels, caller is responsible for
+ * anything that needs GraphicsExpose-style obscured-region recovery"
+ * contract - same accepted behavior upstream's own callers (e.g.
+ * Fl_Scroll) rely on. */
+int fl_scroll(int X, int Y, int W, int H, int dx, int dy,
+              void (*draw_area)(void *data, int x, int y, int w, int h), void *data);
 
 /* ------------------------------------------------------------------ */
 /* Portable vertex/matrix drawing (new; ported from src/fl_vertex.cxx  */
