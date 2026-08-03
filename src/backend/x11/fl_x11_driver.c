@@ -11,9 +11,14 @@
  * polygon fills, transforms and offscreen surfaces are not implemented.
  * See docs/DESIGN.md.
  */
+#ifndef _DEFAULT_SOURCE
+#define _DEFAULT_SOURCE /* strdup()/strcasecmp() under strict -std=c99 */
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h> /* strcasecmp */
+#include <fontconfig/fontconfig.h>
 
 #include "fl_x11_internal.h"
 
@@ -261,15 +266,80 @@ typedef struct { Fl_Font face; Fl_Fontsize size; XftFont *font; } FontCacheEntry
 static FontCacheEntry g_font_cache[FONT_CACHE_SIZE];
 static int g_font_cache_count = 0;
 
+/* Custom families registered via Fl_set_font_family(), one entry per
+ * 4-slot block starting at FL_FREE_FONT (regular/bold/italic/bold-italic,
+ * same packing the 12 builtin FL_HELVETICA/FL_COURIER/FL_TIMES faces
+ * already use - see font_is_bold/font_is_italic below). */
+#define CUSTOM_FONT_FAMILIES_MAX 64
+static char *g_custom_families[CUSTOM_FONT_FAMILIES_MAX];
+static int g_custom_family_count = 0;
+
+Fl_Font Fl_set_font_family(const char *name) {
+    int i;
+    if (!name || !*name) name = "sans";
+    for (i = 0; i < g_custom_family_count; i++) {
+        if (strcasecmp(g_custom_families[i], name) == 0)
+            return FL_FREE_FONT + i * 4;
+    }
+    if (g_custom_family_count >= CUSTOM_FONT_FAMILIES_MAX)
+        return FL_HELVETICA; /* table full: fall back to a safe builtin */
+    g_custom_families[g_custom_family_count] = strdup(name);
+    return FL_FREE_FONT + (g_custom_family_count++) * 4;
+}
+
+/* Real fontconfig existence check (unlike Fl_set_font_family(), which
+ * always succeeds by design - Xft/fontconfig substitute a default when
+ * a family isn't installed, so it can't itself distinguish "found the
+ * real thing" from "silently substituted"). Resolves name via the same
+ * matching fontconfig/Xft would use, then checks whether the *matched*
+ * family genuinely equals the requested one - an exact substring/case-
+ * insensitive comparison, since fontconfig's own substitution aliases
+ * (e.g. generic "sans"/"serif"/"monospace") legitimately resolve to a
+ * different concrete family name on purpose. */
+int Fl_font_family_exists(const char *name) {
+    FcPattern *pat;
+    FcResult result;
+    FcPattern *match;
+    int exists = 0;
+
+    if (!name || !*name) return 0;
+
+    pat = FcNameParse((const FcChar8 *)name);
+    if (!pat) return 0;
+    FcConfigSubstitute(NULL, pat, FcMatchPattern);
+    FcDefaultSubstitute(pat);
+
+    match = FcFontMatch(NULL, pat, &result);
+    if (match) {
+        FcChar8 *matched_family = NULL;
+        if (FcPatternGetString(match, FC_FAMILY, 0, &matched_family) == FcResultMatch &&
+            matched_family) {
+            exists = (strcasecmp((const char *)matched_family, name) == 0);
+        }
+        FcPatternDestroy(match);
+    }
+    FcPatternDestroy(pat);
+    return exists;
+}
+
 static const char *font_family(Fl_Font face) {
+    if (face >= FL_FREE_FONT) {
+        int idx = (face - FL_FREE_FONT) / 4;
+        if (idx >= 0 && idx < g_custom_family_count) return g_custom_families[idx];
+        return "sans";
+    }
     switch (face & ~3) {
         case FL_COURIER: return "monospace";
         case FL_TIMES: return "serif";
         default: return "sans";
     }
 }
-static int font_is_bold(Fl_Font face) { return (face >= FL_HELVETICA && face <= FL_TIMES_BOLD_ITALIC) && (face & 1); }
-static int font_is_italic(Fl_Font face) { return (face >= FL_HELVETICA && face <= FL_TIMES_BOLD_ITALIC) && (face & 2); }
+static int font_is_bold(Fl_Font face) {
+    return ((face >= FL_HELVETICA && face <= FL_TIMES_BOLD_ITALIC) || face >= FL_FREE_FONT) && (face & 1);
+}
+static int font_is_italic(Fl_Font face) {
+    return ((face >= FL_HELVETICA && face <= FL_TIMES_BOLD_ITALIC) || face >= FL_FREE_FONT) && (face & 2);
+}
 
 static XftFont *load_font(Fl_Font face, Fl_Fontsize size) {
     int i;

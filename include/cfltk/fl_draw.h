@@ -200,6 +200,32 @@ static inline void fl_pie(int x, int y, int w, int h, double a1, double a2) {
 
 static inline void fl_font(Fl_Font face, Fl_Fontsize size) { fl_graphics_driver()->font(face, size); }
 static inline Fl_Font fl_font_current(void) { return fl_graphics_driver()->current_font(); }
+
+/* Registers (idempotently, by name - repeat calls with the same name
+ * return the same slot) a system font family beyond the 12 builtin
+ * FL_HELVETICA/FL_COURIER/FL_TIMES faces, for embedders that need to
+ * select an arbitrary installed font by name (e.g. matching a CSS
+ * font-family request) instead of being limited to the 3 generic
+ * builtin families. Returns the "regular" Fl_Font for that family; the
+ * bold/italic/bold-italic variants are `result | FL_BOLD`,
+ * `result | FL_ITALIC`, `result | (FL_BOLD|FL_ITALIC)` respectively,
+ * exactly like the builtin FL_HELVETICA/etc. slots (see
+ * Enumerations.h). Matches upstream FLTK's own free-font-numbering
+ * convention (FL_FREE_FONT). The actual font is resolved via
+ * fontconfig/Xft at draw time, which already falls back gracefully to
+ * a default if the named family isn't installed - so this never fails
+ * and never needs a paired "does this font exist" query. */
+Fl_Font Fl_set_font_family(const char *name);
+
+/* Real fontconfig existence check for a family name: returns nonzero
+ * only if fontconfig's own matching resolves `name` to itself (not a
+ * generic substitution/fallback to some other installed family).
+ * Unlike Fl_set_font_family() (which always "succeeds" by design, via
+ * Xft/fontconfig's automatic substitution), this can genuinely say "no,
+ * that font isn't installed" - useful for CSS font-family fallback
+ * lists, where the caller needs to know whether to keep trying the next
+ * candidate in the list. */
+int Fl_font_family_exists(const char *name);
 static inline Fl_Fontsize fl_size(void) { return fl_graphics_driver()->current_size(); }
 static inline int fl_height(void) { return fl_graphics_driver()->height(); }
 static inline int fl_descent(void) { return fl_graphics_driver()->descent(); }

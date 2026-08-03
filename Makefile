@@ -31,8 +31,8 @@ CFLAGS  ?= -std=c99 -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initi
 # manifests as a segfault calling through a garbage function pointer,
 # not a compile error.
 DEPFLAGS := -MMD -MP
-X11_CFLAGS := $(shell pkg-config --cflags x11 xft)
-X11_LIBS   := $(shell pkg-config --libs x11 xft) -lm
+X11_CFLAGS := $(shell pkg-config --cflags x11 xft fontconfig)
+X11_LIBS   := $(shell pkg-config --libs x11 xft fontconfig) -lm
 
 CORE_SRCS := \
     src/core/Fl_Widget.c \
