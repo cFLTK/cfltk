@@ -80,6 +80,15 @@ int fl_utf_nb_char(const unsigned char *str, int len);
 int fl_utf_tolower(const unsigned char *str, int len, char *buf);
 int fl_utf_toupper(const unsigned char *str, int len, char *buf);
 
+/* True if ucs is a combining (zero-width, "nonspacing") character - a
+ * diacritical mark that should be drawn stacked on the previous
+ * character rather than advancing the cursor. Covers the Unicode
+ * "Combining Diacritical Marks" block and its Supplement/Symbols/Half
+ * Marks relatives (U+0300-036F, U+1DC0-1DFF, U+20D0-20FF, U+FE20-FE2F)
+ * - the common case; not a full combining-class table (upstream's own
+ * fl_nonspacing() is a range check too, not exhaustive). */
+int fl_nonspacing(unsigned int ucs);
+
 #ifdef __cplusplus
 }
 #endif

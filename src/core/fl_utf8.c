@@ -194,3 +194,10 @@ int fl_utf_tolower(const unsigned char *str, int len, char *buf) {
 int fl_utf_toupper(const unsigned char *str, int len, char *buf) {
     return utf_case_convert(str, len, buf, 1);
 }
+
+int fl_nonspacing(unsigned int ucs) {
+    return (ucs >= 0x0300 && ucs <= 0x036f) ||
+           (ucs >= 0x1dc0 && ucs <= 0x1dff) ||
+           (ucs >= 0x20d0 && ucs <= 0x20ff) ||
+           (ucs >= 0xfe20 && ucs <= 0xfe2f);
+}
