@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include <X11/XKBlib.h>
+#include <X11/cursorfont.h>
 
 #include "fl_x11_internal.h"
 #include "../fl_backend.h"
@@ -254,4 +255,82 @@ void fl_backend_beep(int type) {
     /* FL_BEEP_DEFAULT(0)/FL_BEEP_ERROR(2): louder; everything else:
      * quieter -- matches upstream's XBell(fl_display,100)/(...,50) split. */
     XBell(fl_x11_display, (type == 0 || type == 2) ? 100 : 50);
+}
+
+/* ------------------------------------------------------------------ */
+/* Cursor shapes (Fl_Window_set_cursor(), see Fl_Window.h)             */
+/* ------------------------------------------------------------------ */
+
+static unsigned int x11_cursor_shape(Fl_Cursor c) {
+    switch (c) {
+        case FL_CURSOR_ARROW:  return XC_left_ptr;
+        case FL_CURSOR_CROSS:  return XC_crosshair;
+        case FL_CURSOR_WAIT:   return XC_watch;
+        case FL_CURSOR_INSERT: return XC_xterm;
+        case FL_CURSOR_HAND:   return XC_hand2;
+        case FL_CURSOR_HELP:   return XC_question_arrow;
+        case FL_CURSOR_MOVE:   return XC_fleur;
+        case FL_CURSOR_NS:     return XC_sb_v_double_arrow;
+        case FL_CURSOR_WE:     return XC_sb_h_double_arrow;
+        case FL_CURSOR_NWSE:   return XC_top_left_corner;
+        case FL_CURSOR_NESW:   return XC_top_right_corner;
+        case FL_CURSOR_N:      return XC_top_side;
+        case FL_CURSOR_NE:     return XC_top_right_corner;
+        case FL_CURSOR_E:      return XC_right_side;
+        case FL_CURSOR_SE:     return XC_bottom_right_corner;
+        case FL_CURSOR_S:      return XC_bottom_side;
+        case FL_CURSOR_SW:     return XC_bottom_left_corner;
+        case FL_CURSOR_W:      return XC_left_side;
+        case FL_CURSOR_NW:     return XC_top_left_corner;
+        case FL_CURSOR_DEFAULT:
+        default:               return XC_left_ptr;
+    }
+}
+
+/* One cached X Cursor per shape, created on first use and kept for the
+ * process lifetime (same convention as cfltk's font cache) - X cursor
+ * objects are cheap, shared, and there are at most ~20 distinct shapes,
+ * so there is no reason to ever destroy one. Indexed by Fl_Cursor's
+ * raw enum value (0..255, see Enumerations.h) via a sparse lookup
+ * rather than a 256-entry array, since only a handful are ever used. */
+#define CURSOR_CACHE_SIZE 32
+typedef struct { Fl_Cursor shape; Cursor xcursor; } CursorCacheEntry;
+static CursorCacheEntry g_cursor_cache[CURSOR_CACHE_SIZE];
+static int g_cursor_cache_count = 0;
+static Cursor g_none_cursor = 0;
+
+static Cursor x11_cursor_for(Fl_Cursor c) {
+    int i;
+    Cursor xc;
+
+    if (c == FL_CURSOR_NONE) {
+        if (!g_none_cursor) {
+            char data = 0;
+            Pixmap blank = XCreateBitmapFromData(fl_x11_display, fl_x11_root, &data, 1, 1);
+            XColor black;
+            memset(&black, 0, sizeof(black));
+            g_none_cursor = XCreatePixmapCursor(fl_x11_display, blank, blank, &black, &black, 0, 0);
+            XFreePixmap(fl_x11_display, blank);
+        }
+        return g_none_cursor;
+    }
+
+    for (i = 0; i < g_cursor_cache_count; i++)
+        if (g_cursor_cache[i].shape == c) return g_cursor_cache[i].xcursor;
+
+    xc = XCreateFontCursor(fl_x11_display, x11_cursor_shape(c));
+    if (g_cursor_cache_count < CURSOR_CACHE_SIZE) {
+        g_cursor_cache[g_cursor_cache_count].shape = c;
+        g_cursor_cache[g_cursor_cache_count].xcursor = xc;
+        g_cursor_cache_count++;
+    }
+    return xc;
+}
+
+void Fl_Window_set_cursor(Fl_Window *self, Fl_Cursor c) {
+    Fl_X11_Window *xw;
+    if (!fl_x11_display || !self) return;
+    xw = (Fl_X11_Window *)self->backend_data;
+    if (!xw) return; /* not shown yet: nothing to define a cursor on */
+    XDefineCursor(fl_x11_display, xw->real_xid, x11_cursor_for(c));
 }

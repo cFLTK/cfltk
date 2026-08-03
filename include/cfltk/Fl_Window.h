@@ -95,6 +95,15 @@ static inline void Fl_Window_clear_border(Fl_Window *self) {
  * a redraw and a fresh backend blit on the next flush. */
 void Fl_Window_flush(Fl_Window *self);
 
+/* Sets the mouse pointer shape shown while over this window (X11
+ * backend: XCreateFontCursor()/XDefineCursor() against the window's
+ * real_xid, cached per shape - never freed, matching the process-
+ * lifetime cache every other cfltk resource cache already uses). A
+ * no-op if the window isn't currently shown (no XID to define a
+ * cursor on yet) - matches upstream's own documented behavior of
+ * silently doing nothing before show(). */
+void Fl_Window_set_cursor(Fl_Window *self, Fl_Cursor c);
+
 /* Positions the window so that its own point (X,Y) lands at the
  * current (live-queried) mouse position, clamped to stay fully
  * on-screen unless offscreen is set. Mirrors upstream's

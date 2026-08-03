@@ -351,6 +351,36 @@ static inline Fl_Color fl_gray_color(uchar g) {
  * else (WIN32/X11) -- cfltk only targets the latter. */
 #define FL_COMMAND   FL_CTRL
 
+/* Standard cursor shapes, for Fl_Window_set_cursor() (see Fl_Window.h).
+ * Same names/values as upstream FLTK's Fl_Cursor enum, mapped to X11's
+ * standard cursor font glyphs (XC_* in <X11/cursorfont.h>) in the X11
+ * backend (fl_x11_window.c) - not a 1:1 numeric mapping to XC_* indices,
+ * just upstream's own arbitrary enumeration, kept for source
+ * compatibility with code written against real FLTK. */
+typedef enum {
+    FL_CURSOR_DEFAULT = 0,
+    FL_CURSOR_ARROW   = 35,
+    FL_CURSOR_CROSS   = 66,
+    FL_CURSOR_WAIT    = 76,
+    FL_CURSOR_INSERT  = 77,
+    FL_CURSOR_HAND    = 31,
+    FL_CURSOR_HELP    = 47,
+    FL_CURSOR_MOVE    = 27,
+    FL_CURSOR_NS      = 78,
+    FL_CURSOR_WE      = 79,
+    FL_CURSOR_NWSE    = 80,
+    FL_CURSOR_NESW    = 81,
+    FL_CURSOR_N       = 70,
+    FL_CURSOR_NE      = 69,
+    FL_CURSOR_E       = 49,
+    FL_CURSOR_SE      = 8,
+    FL_CURSOR_S       = 9,
+    FL_CURSOR_SW      = 7,
+    FL_CURSOR_W       = 36,
+    FL_CURSOR_NW      = 68,
+    FL_CURSOR_NONE    = 255
+} Fl_Cursor;
+
 #ifdef __cplusplus
 }
 #endif
