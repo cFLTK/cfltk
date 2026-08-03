@@ -106,6 +106,10 @@ void fl_backend_window_create(Fl_Window *win) {
         const char *label = Fl_Window_label(win);
         if (label) XStoreName(fl_x11_display, xw->real_xid, label);
     }
+    {
+        const char *icon_label = Fl_Window_icon_label(win);
+        if (icon_label) XSetIconName(fl_x11_display, xw->real_xid, icon_label);
+    }
 
     if (g_default_xclass) {
         /* WM_CLASS carries both an instance name and a class name;
@@ -189,6 +193,16 @@ void fl_backend_window_reshape(Fl_Window *win) {
     height = w->h > 0 ? w->h : 1;
     XMoveResizeWindow(fl_x11_display, xw->real_xid, w->x, w->y, (unsigned)width, (unsigned)height);
     if (win->double_buffered) resize_offscreen(win, xw, width, height);
+}
+
+void fl_backend_window_relabel(Fl_Window *win) {
+    Fl_X11_Window *xw = fl_x11_window_data(win);
+    const char *label, *icon_label;
+    if (!xw) return;
+    label = Fl_Window_label(win);
+    if (label) XStoreName(fl_x11_display, xw->real_xid, label);
+    icon_label = Fl_Window_icon_label(win);
+    if (icon_label) XSetIconName(fl_x11_display, xw->real_xid, icon_label);
 }
 
 void fl_backend_window_destroy(Fl_Window *win) {

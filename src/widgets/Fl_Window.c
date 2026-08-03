@@ -47,6 +47,7 @@ void Fl_Window_init(Fl_Window *self, int x, int y, int w, int h, const char *lab
     self->group.resizable_widget = NULL; /* upstream: NULL by default for windows, unlike Fl_Group */
 
     self->label_copy = NULL;
+    self->icon_label_copy = NULL;
     self->backend_data = NULL;
     self->shown = 0;
     self->next_shown = NULL;
@@ -70,6 +71,8 @@ void Fl_Window_destroy(Fl_Widget *self_w) {
     if (self->shown) Fl_Window_hide(self_w);
     free(self->label_copy);
     self->label_copy = NULL;
+    free(self->icon_label_copy);
+    self->icon_label_copy = NULL;
     Fl_Group_destroy(self_w);
 }
 
@@ -125,6 +128,27 @@ void Fl_Window_set_label(Fl_Window *self, const char *text) {
         memcpy(self->label_copy, text, strlen(text) + 1);
     }
     Fl_Widget_set_label(&self->group.widget, self->label_copy);
+    if (self->shown) fl_backend_window_relabel(self);
+}
+
+/* Sets the window's separate taskbar/icon label (X11: WM_ICON_NAME),
+ * matching upstream's two-arg Fl_Window::label(title, iconlabel) -
+ * split into its own setter here since C has no overloading. If never
+ * called (icon_label_copy stays NULL), the backend falls back to
+ * showing the same text as the window title, matching what upstream's
+ * *one-arg* `label(title)` does (WM_ICON_NAME left unset entirely by
+ * upstream in that case, which every window manager already falls
+ * back to WM_NAME for - so mirroring that fallback here rather than
+ * literally leaving WM_ICON_NAME unset is an equivalent, simpler
+ * implementation, not a behavioral deviation from what's observable). */
+void Fl_Window_set_icon_label(Fl_Window *self, const char *text) {
+    free(self->icon_label_copy);
+    self->icon_label_copy = NULL;
+    if (text) {
+        self->icon_label_copy = (char *)malloc(strlen(text) + 1);
+        memcpy(self->icon_label_copy, text, strlen(text) + 1);
+    }
+    if (self->shown) fl_backend_window_relabel(self);
 }
 
 void Fl_Window_set_border(Fl_Window *self, int b) {

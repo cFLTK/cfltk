@@ -37,6 +37,9 @@ struct Fl_Window {
     Fl_Group group;
 
     char *label_copy;    /* owned copy made by Fl_Window_set_label(), or NULL */
+    char *icon_label_copy; /* owned copy made by Fl_Window_set_icon_label(),
+                             * or NULL (falls back to label_copy - see
+                             * Fl_Window_set_icon_label()'s own comment) */
     void *backend_data;  /* opaque handle owned by the platform backend */
 
     int shown;
@@ -82,6 +85,16 @@ static inline int Fl_Window_shown(const Fl_Window *self) { return self->shown; }
 void Fl_Window_set_label(Fl_Window *self, const char *text);
 static inline const char *Fl_Window_label(const Fl_Window *self) {
     return Fl_Widget_label(&self->group.widget);
+}
+
+/* Sets the window's separate taskbar/icon label (X11 WM_ICON_NAME),
+ * matching upstream's two-arg Fl_Window::label(title, iconlabel) -
+ * split into its own setter here since C has no overloading. Call
+ * Fl_Window_set_label() for the title and this for the icon label
+ * (order doesn't matter, either can be called first or alone). */
+void Fl_Window_set_icon_label(Fl_Window *self, const char *text);
+static inline const char *Fl_Window_icon_label(const Fl_Window *self) {
+    return self->icon_label_copy ? self->icon_label_copy : Fl_Window_label(self);
 }
 
 static inline unsigned int Fl_Window_border(const Fl_Window *self) {

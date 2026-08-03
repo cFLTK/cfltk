@@ -32,6 +32,13 @@ void fl_backend_window_destroy(Fl_Window *win);
  * already been updated. No-op if the window isn't shown yet. */
 void fl_backend_window_reshape(Fl_Window *win);
 
+/* Re-syncs the native window's title (WM_NAME) and icon/taskbar label
+ * (WM_ICON_NAME) after Fl_Window's label_copy/icon_label_copy have
+ * already been updated. No-op if the window isn't shown yet (the
+ * initial values get applied once at window-creation time instead, see
+ * fl_backend_window_create()). */
+void fl_backend_window_relabel(Fl_Window *win);
+
 /* Blits/exposes whatever cfltk drew into the window's damaged area. */
 void fl_backend_window_flush(Fl_Window *win);
 
