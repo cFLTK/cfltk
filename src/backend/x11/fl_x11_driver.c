@@ -445,12 +445,33 @@ static void d_draw_image(const unsigned char *buf, int x, int y, int w, int h, i
     XDestroyImage(img); /* also frees `data` */
 }
 
+/* XGetImage legitimately fails with a BadMatch protocol error if the
+ * target window is (even momentarily) not fully viewable - e.g. mid
+ * resize, mid expose, or partially obscured/off-screen at the exact
+ * instant a masked pixmap is redrawn (see Fl_Pixmap.c's
+ * mask_composite(), the caller most likely to hit this in practice: it
+ * runs on every redraw of a transparent toolbar icon). Xlib's default
+ * error handler treats *any* unhandled protocol error as fatal and
+ * terminates the whole process - this crashed real, tested dillo
+ * builds in practice, matching a real user's bug report. Matches
+ * upstream FLTK's own fl_read_image() (fl_read_image.cxx), which
+ * wraps this exact call with a temporary error handler for this exact
+ * reason ("the window is obscured etc. the function will still fail.
+ * Make sure we catch the error and continue"). */
+static int xgetimage_err_handler(Display *display, XErrorEvent *error) {
+    (void)display; (void)error;
+    return 0;
+}
+
 static void d_read_image(unsigned char *buf, int x, int y, int w, int h, int d) {
     XImage *img;
     int row, col;
+    XErrorHandler old_handler;
 
     if (!fl_x11_current_target || w <= 0 || h <= 0) return;
+    old_handler = XSetErrorHandler(xgetimage_err_handler);
     img = XGetImage(fl_x11_display, fl_x11_current_target->xid, x, y, (unsigned)w, (unsigned)h, AllPlanes, ZPixmap);
+    XSetErrorHandler(old_handler);
     if (!img) { memset(buf, 0, (size_t)w * (size_t)h * (size_t)d); return; }
 
     for (row = 0; row < h; row++) {
