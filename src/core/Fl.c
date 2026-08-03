@@ -316,8 +316,24 @@ void Fl_copy(const char *text, int len, int clipboard) {
     if (!text || len <= 0) return;
     buf = &g_clipboard[slot];
     free(*buf);
-    *buf = (char *)malloc((size_t)len);
+    /* +1 and NUL-terminate: matches upstream, where Fl::event_text()
+     * is always a valid C string regardless of what Fl::event_length()
+     * says. Found missing while wiring up Fl_dnd()/the Xdnd target
+     * path (fl_x11_dnd.c) - every existing in-process Fl_copy() caller
+     * happened to pass text that was already part of a NUL-terminated
+     * source buffer, so the missing terminator here was silently never
+     * exercised; a real drag-and-drop payload (arbitrary external
+     * bytes, no guaranteed trailing NUL of its own once copied through
+     * here) reliably reads into whatever heap byte after the buffer
+     * cointoss to end on, corrupting whatever the receiving Fl_paste()
+     * callback treats event_text() as - confirmed via dillo's own
+     * Clear-button paste handler (src/ui.c's custPasteButton_handle(),
+     * which -- along with every real Fl::event_text() consumer, in
+     * dillo and otherwise -- calls it as a plain C string) appending
+     * garbage bytes onto a dropped URL. */
+    *buf = (char *)malloc((size_t)len + 1);
     memcpy(*buf, text, (size_t)len);
+    (*buf)[len] = '\0';
     g_clipboard_len[slot] = len;
 }
 
@@ -328,6 +344,11 @@ void Fl_paste(Fl_Widget *receiver, int clipboard) {
     g_ctx.e_length = g_clipboard_len[slot];
     Fl_Widget_handle(receiver, FL_PASTE);
     g_ctx.e_text_override = NULL;
+}
+
+int Fl_dnd(void) {
+    if (!g_clipboard[0] || g_clipboard_len[0] <= 0) return 0;
+    return fl_backend_dnd_start(g_clipboard[0], g_clipboard_len[0]);
 }
 
 /* Called by the backend as it translates a native event; kept internal
@@ -567,6 +588,16 @@ int Fl_context_handle(int event, Fl_Window *window) {
             return Fl_Widget_handle(wi, FL_MOVE);
 
         case FL_LEAVE:
+            Fl_set_belowmouse(NULL);
+            return 1;
+
+        case FL_DND_LEAVE:
+            /* Matches FL_LEAVE above - the drag left the window (or was
+             * cancelled), so nothing is belowmouse for DND purposes
+             * anymore. Whatever widget was tracking the hover already
+             * got a chance to react via FL_DND_ENTER/FL_DND_DRAG (see
+             * Fl_Group_handle()); no separate per-widget FL_DND_LEAVE
+             * forwarding needed since there's no drop to react to. */
             Fl_set_belowmouse(NULL);
             return 1;
 

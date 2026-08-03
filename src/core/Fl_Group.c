@@ -471,6 +471,28 @@ int Fl_Group_handle(Fl_Widget *self_w, int event) {
             Fl_set_belowmouse(self_w);
             return 1;
 
+        /* Same coordinate-based belowmouse tracking as FL_ENTER/FL_MOVE
+         * above (a drag-and-drop hover is the DND equivalent of a plain
+         * mouse move), but forwards the real FL_DND_ENTER/FL_DND_DRAG
+         * event type instead of hardcoding FL_MOVE - lets a widget
+         * distinguish "the mouse moved" from "something is being
+         * dragged over me" if it ever overrides handle() for that.
+         * Keeping Fl_belowmouse() accurate through a drag is also what
+         * lets the eventual drop deliver its data (FL_PASTE, via
+         * Fl_paste()) to the right widget - see fl_x11_dnd.c. */
+        case FL_DND_ENTER:
+        case FL_DND_DRAG:
+            for (i = self->children_count - 1; i >= 0; i--) {
+                o = a[i];
+                if (Fl_Widget_visible(o) && Fl_event_inside(o)) {
+                    if (Fl_Widget_contains(o, Fl_belowmouse())) return send(o, FL_DND_DRAG);
+                    Fl_set_belowmouse(o);
+                    if (send(o, FL_DND_ENTER)) return 1;
+                }
+            }
+            Fl_set_belowmouse(self_w);
+            return 1;
+
         case FL_PUSH: {
             for (i = self->children_count - 1; i >= 0; i--) {
                 Fl_Widget_Tracker wp;

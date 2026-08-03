@@ -59,6 +59,20 @@ const Fl_Graphics_Driver *fl_x11_graphics_driver(void);
 void fl_x11_driver_init(void);
 
 Fl_X11_Window *fl_x11_window_data(Fl_Window *win);
+Fl_Window *find_window(Window xid); /* fl_x11_event.c, shared with fl_x11_dnd.c */
+
+/* fl_x11_dnd.c -- Xdnd protocol (drag-and-drop), backing Fl_dnd() and
+ * the FL_DND_ENTER/FL_DND_DRAG/FL_DND_LEAVE/FL_DND_RELEASE events
+ * dispatched into FL_PASTE on drop. */
+void fl_x11_dnd_window_created(Window xid); /* sets XdndAware; call once per real window */
+/* Called from dispatch_one()'s ClientMessage/SelectionNotify cases;
+ * returns 1 if the event was Xdnd-related and has been handled. */
+int fl_x11_dnd_handle_client_message(XEvent *ev);
+int fl_x11_dnd_handle_selection_notify(XEvent *ev);
+int fl_x11_dnd_handle_selection_request(XEvent *ev);
+/* Source side (int fl_backend_dnd_start(const char*, int), implemented
+ * directly under that name in fl_x11_dnd.c) declared in
+ * ../fl_backend.h, not repeated here. */
 
 /* fl_x11_offscreen.c -- see include/cfltk/fl_draw.h for the public
  * fl_create_offscreen()/... wrappers these back. */

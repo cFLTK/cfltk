@@ -109,6 +109,22 @@ void Fl_copy(const char *text, int len, int clipboard);
  * duration of that call only). No-op if the clipboard is empty. */
 void Fl_paste(Fl_Widget *receiver, int clipboard);
 
+/* Drags clipboard buffer 0's current contents (fill it with
+ * Fl_copy(text, len, 0) first) via the desktop's real drag-and-drop
+ * protocol (X11: Xdnd) - matching upstream's Fl::dnd(), which has no
+ * separate "set the drag payload" call either, it drags whatever's
+ * already in that same buffer. Unlike the rest of this clipboard
+ * section's own "in-process only" limitation above, this genuinely
+ * interoperates with other applications on the desktop (X11: claims
+ * real ownership of the XdndSelection selection and answers other
+ * clients' SelectionRequest for it, independent of - and not a fix
+ * for - CLIPBOARD/PRIMARY still being in-process only). Blocks until
+ * the user drops it somewhere or cancels (releases the mouse button
+ * over nothing accepting it); returns non-zero if a drop was accepted,
+ * zero if cancelled. Call from a widget's own handle() in response to
+ * a drag gesture (e.g. FL_DRAG past some threshold). */
+int Fl_dnd(void);
+
 /* -------------------------------------------------------------------
  * Timers -- mirrors Fl::add_timeout()/repeat_timeout()/remove_timeout().
  *

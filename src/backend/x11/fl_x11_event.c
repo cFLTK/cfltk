@@ -13,7 +13,7 @@
 #include "cfltk/Fl.h"
 #include "cfltk/Fl_Group.h"
 
-static Fl_Window *find_window(Window xid) {
+Fl_Window *find_window(Window xid) {
     Fl_Window *w;
     for (w = Fl_first_window(); w; w = Fl_next_window(w)) {
         Fl_X11_Window *xw = fl_x11_window_data(w);
@@ -157,6 +157,7 @@ static int dispatch_one(XEvent *ev) {
         }
 
         case ClientMessage: {
+            if (fl_x11_dnd_handle_client_message(ev)) return 1;
             win = find_window(ev->xclient.window);
             if (!win) return 0;
             if ((Atom)ev->xclient.data.l[0] == fl_x11_wm_delete_window) {
@@ -164,6 +165,12 @@ static int dispatch_one(XEvent *ev) {
             }
             return 1;
         }
+
+        case SelectionNotify:
+            return fl_x11_dnd_handle_selection_notify(ev);
+
+        case SelectionRequest:
+            return fl_x11_dnd_handle_selection_request(ev);
 
         default:
             return 0;

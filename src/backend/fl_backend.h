@@ -95,6 +95,13 @@ void fl_backend_query_pointer(int *x_root, int *y_root);
  * self-contained/backend-agnostic. */
 void fl_backend_beep(int type);
 
+/* Drags `text` (len bytes) via the platform's native drag-and-drop
+ * protocol (X11: Xdnd) until the user drops it or cancels - blocks for
+ * the duration of the drag, matching upstream's Fl::dnd() (see
+ * cfltk/Fl.h). Returns non-zero if the drop was accepted somewhere,
+ * zero if cancelled. */
+int fl_backend_dnd_start(const char *text, int len);
+
 /* Fills in the core's event-state snapshot; called by the backend right
  * before Fl_context_handle(). Declared in Fl.c, not here, because it
  * writes to the core's private Fl_Context -- this prototype is the

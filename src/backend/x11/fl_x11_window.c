@@ -101,6 +101,7 @@ void fl_backend_window_create(Fl_Window *win) {
     xw->real_xft_draw = XftDrawCreate(fl_x11_display, xw->real_xid, fl_x11_visual, fl_x11_colormap);
 
     XSetWMProtocols(fl_x11_display, xw->real_xid, &fl_x11_wm_delete_window, 1);
+    fl_x11_dnd_window_created(xw->real_xid);
 
     {
         const char *label = Fl_Window_label(win);
