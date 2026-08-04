@@ -265,10 +265,34 @@ void Fl_Widget_deactivate(Fl_Widget *self) {
 }
 
 int Fl_Widget_take_focus(Fl_Widget *self) {
+    /* Fl_Group's FL_FOCUS handler may re-enter here via its saved_focus
+     * widget (see Fl_Group_handle). Fl_set_focus() records the *new*
+     * focus target as saved_focus on every ancestor of the widget being
+     * unfocused, so it is possible for two unrelated groups A and B to
+     * each end up with the other as saved_focus (A.saved_focus == B and
+     * B.saved_focus == A). Without a guard, A's FL_FOCUS handler calls
+     * take_focus(B), whose handler calls take_focus(A), forever -- a
+     * stack-overflow SIGSEGV rather than a normal "declined" return.
+     * Track widgets currently being entered on this call chain and bail
+     * out the moment one repeats. */
+    static Fl_Widget *entered[64];
+    static int depth = 0;
+    int i;
+
     if (!Fl_Widget_takesevents(self)) return 0;
     if (!Fl_Widget_visible_focus(self)) return 0;
     if (Fl_focus() == self) return 1;
-    if (!Fl_Widget_handle(self, FL_FOCUS)) return 0;
+
+    for (i = 0; i < depth; i++) {
+        if (entered[i] == self) return 0; /* cycle detected */
+    }
+    if (depth >= (int)(sizeof(entered) / sizeof(entered[0]))) return 0;
+
+    entered[depth++] = self;
+    int ok = Fl_Widget_handle(self, FL_FOCUS);
+    depth--;
+    if (!ok) return 0;
+
     Fl_set_focus(self);
     return 1;
 }
