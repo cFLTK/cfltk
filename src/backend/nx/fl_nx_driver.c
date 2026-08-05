@@ -7,16 +7,15 @@
  *
  * Solid colors, clipping (single-rectangle stack, same simplification
  * the X11 backend itself makes), line/rect/arc/polygon primitives,
- * text/font, and offscreen surfaces (fl_nx_offscreen.c, wired in at
- * the bottom of this file) are all implemented. Raw image blit/
- * read-back and bitmask stipple remain honest no-op stubs -- see each
- * one's own comment below -- pending the image-decoders milestone;
- * neither is reachable from a bare Fl_Window/Fl_Double_Window with no
- * image widgets.
+ * text/font, offscreen surfaces (fl_nx_offscreen.c, wired in at the
+ * bottom of this file), and raw image blit/read-back/bitmask stipple
+ * (via SetPixel()/GetPixel() loops -- see that section's own comment
+ * for why, not a bulk-blit primitive) are all implemented.
  */
 #include <nuttx/config.h> /* must be first -- see fl_nx_window.c's comment */
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "fl_nx_internal.h"
 
@@ -374,22 +373,97 @@ static void d_text_extents(const char *text, int n, int *dx, int *dy, int *w, in
 }
 
 /* ------------------------------------------------------------------ */
-/* Raw image blit/read-back, bitmask stipple -- NOT YET IMPLEMENTED.   */
-/* Unreachable from a bare Fl_Window; real support is the Image        */
-/* decoders/rendering milestone (docs/analysis.md Sec.6/7).            */
+/* Raw image blit/read-back, bitmask stipple.                          */
+/*                                                                      */
+/* mwin has no bulk image-blit primitive equivalent to Xlib's           */
+/* XPutImage()/XGetImage() (no SetDIBitsToDevice()/GetDIBits(), and     */
+/* CreateDIBSection() is unexercised anywhere else in this vendored     */
+/* tree -- too risky to build a new, untested pixel-format path on).    */
+/* SetPixel()/GetPixel() (already used by d_point() above) are the      */
+/* only proven primitives available, so these are per-pixel loops --    */
+/* slow next to XPutImage()'s one round trip, fine for the image sizes  */
+/* a browser chrome/content area actually needs at this milestone.      */
 /* ------------------------------------------------------------------ */
 
 static void d_draw_image(const unsigned char *buf, int x, int y, int w, int h, int d, int ld) {
-    (void)buf; (void)x; (void)y; (void)w; (void)h; (void)d; (void)ld;
+    int row, col, stride;
+    HDC hdc;
+
+    if (!fl_nx_current_target || w <= 0 || h <= 0 || !buf) return;
+    hdc = fl_nx_current_target->hdc;
+    stride = ld != 0 ? ld : w * d;
+
+    for (row = 0; row < h; row++) {
+        const unsigned char *src = buf + (size_t)row * (size_t)stride;
+        for (col = 0; col < w; col++) {
+            COLORREF cr;
+            if (d >= 3) {
+                cr = RGB(src[0], src[1], src[2]);
+            } else {
+                cr = RGB(src[0], src[0], src[0]);
+            }
+            src += d;
+            SetPixel(hdc, x + col, y + row, cr);
+        }
+    }
 }
+
 static void d_read_image(unsigned char *buf, int x, int y, int w, int h, int d) {
-    /* Not implemented -- caller's buffer is left untouched. Only used
-     * for software alpha compositing (see cfltk/fl_draw.h), not
-     * exercised by a bare Fl_Window. */
-    (void)buf; (void)x; (void)y; (void)w; (void)h; (void)d;
+    int row, col;
+    HDC hdc;
+
+    if (!buf || w <= 0 || h <= 0) return;
+    if (!fl_nx_current_target) { memset(buf, 0, (size_t)w * (size_t)h * (size_t)d); return; }
+    hdc = fl_nx_current_target->hdc;
+
+    for (row = 0; row < h; row++) {
+        unsigned char *dst = buf + (size_t)row * (size_t)w * (size_t)d;
+        for (col = 0; col < w; col++) {
+            COLORREF cr = GetPixel(hdc, x + col, y + row);
+            unsigned char r = GetRValue(cr), g = GetGValue(cr), b = GetBValue(cr);
+            if (d >= 3) {
+                dst[0] = r; dst[1] = g; dst[2] = b;
+            } else {
+                dst[0] = (unsigned char)((r * 31 + g * 61 + b * 8) / 100);
+            }
+            dst += d;
+        }
+    }
 }
+
+/* Fl_Bitmap: bits is XBM-format 1-bit data, (bmp_w+7)/8 bytes per row,
+ * LSB-first within each byte -- same convention fl_x11_driver.c's
+ * sibling assumes (it hands the same buffer straight to
+ * XCreateBitmapFromData(), which requires exactly this format). No
+ * mwin stipple-brush primitive exists to offload this to (no
+ * CreatePatternBrush()/BS_PATTERN in this vendored tree's public
+ * wingdi.h) or the same tiled-origin math XSetTSOrigin() does, so this
+ * mirrors XFillRectangle()+FillStippled's semantics directly: only
+ * pixels where the (tiled, cx/cy-offset) pattern bit is set are
+ * painted, in the current foreground color; everything else in the
+ * rect is left untouched. */
 static void d_draw_bitmask(const unsigned char *bits, int bmp_w, int bmp_h, int cx, int cy, int x, int y, int w, int h) {
-    (void)bits; (void)bmp_w; (void)bmp_h; (void)cx; (void)cy; (void)x; (void)y; (void)w; (void)h;
+    int row, col, stride;
+    HDC hdc;
+    uchar r, g, b;
+    COLORREF cr;
+
+    if (!fl_nx_current_target || w <= 0 || h <= 0 || bmp_w <= 0 || bmp_h <= 0 || !bits) return;
+    hdc = fl_nx_current_target->hdc;
+    stride = (bmp_w + 7) / 8;
+    fl_get_color_rgb(g_current_color, &r, &g, &b);
+    cr = RGB(r, g, b);
+
+    for (row = 0; row < h; row++) {
+        int py = y + row;
+        int prow = ((py - cy) % bmp_h + bmp_h) % bmp_h;
+        for (col = 0; col < w; col++) {
+            int px = x + col;
+            int pcol = ((px - cx) % bmp_w + bmp_w) % bmp_w;
+            unsigned char byte = bits[(size_t)prow * (size_t)stride + (size_t)(pcol >> 3)];
+            if (byte & (1u << (pcol & 7))) SetPixel(hdc, px, py, cr);
+        }
+    }
 }
 
 static const Fl_Graphics_Driver g_driver = {
