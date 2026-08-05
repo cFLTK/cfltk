@@ -108,6 +108,18 @@ void fl_backend_window_show(Fl_Window *win) {
     if (!nw) return;
     ShowWindow(nw->hwnd, SW_SHOW);
     UpdateWindow(nw->hwnd);
+    /* mwin does not move keyboard focus to a newly shown window on its
+     * own -- MwInitialize() leaves the internal "DeskTop" root window
+     * (a plain DefWindowProc target, see winmain.c) as focuswp forever
+     * unless something calls SetFocus() explicitly. Without this, every
+     * WM_KEYDOWN/WM_CHAR winevent.c posts goes to that root window's
+     * queue -- which nothing here ever reads -- and this window's
+     * WndProc never sees a single keystroke, no matter how correctly
+     * the rest of the input pipeline works. Found by tracing a real
+     * keyboard-input bug all the way from X11 through
+     * sim_kbdevent()/nuttxkbd_Read() and confirming each of those
+     * genuinely worked before finding this was the actual last gap. */
+    SetFocus(nw->hwnd);
 }
 
 void fl_backend_window_hide(Fl_Window *win) {
