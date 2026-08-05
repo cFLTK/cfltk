@@ -10,21 +10,56 @@
  * fl_x11_event.c's dispatch_one() does per-XEvent, just invoked by
  * DispatchMessage() instead of pulled out of an XNextEvent() loop.
  *
- * First-milestone scope: mouse buttons/motion and window
- * close/paint/resize are translated; keyboard is not yet (WM_KEYDOWN/
- * WM_KEYUP's wParam isn't a Win32 VK_ code in this microwindows tree's
- * headers -- no VK_* table is exposed at all -- so real key-symbol
- * translation needs its own investigation, not a guess baked in here).
- * Click-multiplicity (double/triple-click) tracking, drag-and-drop, and
- * Fl_add_fd()/Fl_remove_fd() (present in the X11 backend) are not yet
- * ported either. Each is a real, separate follow-up, not silently
- * dropped.
+ * Mouse buttons/motion, window close/paint/resize, and keyboard input
+ * are all translated. Keyboard: printable characters dispatch off
+ * WM_CHAR (already shift/caps-translated by TranslateMessage(), so
+ * its wParam is the actual typed character -- matches cfltk's FL_KEY
+ * encoding directly, which is ASCII for the printable range, same as
+ * upstream FLTK's own X11-keysym-derived scheme); navigation/control
+ * keys that never produce a WM_CHAR (arrows, Home/End, Delete/Insert,
+ * PageUp/PageDown, Backspace/Tab/Return/Escape) dispatch off
+ * WM_KEYDOWN/WM_KEYUP through vk_to_fl_key()'s table -- winkbd.h does
+ * have a full VK_* table (an earlier pass of this comment claimed
+ * otherwise off an incomplete search; not true).
+ *
+ * Click-multiplicity (double/triple-click) tracking, drag-and-drop,
+ * and Fl_add_fd()/Fl_remove_fd() timers (present in the X11 backend)
+ * are not yet ported. Each is a real, separate follow-up, not
+ * silently dropped.
  */
 #include <nuttx/config.h> /* must be first -- see fl_nx_window.c's comment */
 #include "fl_nx_internal.h"
 #include "../fl_backend.h"
 #include "cfltk/Fl.h"
 #include "cfltk/Fl_Group.h"
+
+/* VK_* -> FL_* for the keys that never produce a WM_CHAR. cfltk's
+ * FL_KEY encoding is upstream FLTK's own -- raw X11 keysym values for
+ * anything outside the printable-ASCII range -- so this is a real
+ * translation table, not an identity pass-through: e.g. FL_Left is
+ * 0xff51, not VK_LEFT's 0x25. Returns 0 (not a cfltk FL_KEY at all)
+ * for anything not in this table -- the caller drops the event
+ * rather than forwarding a raw VK_ code that would collide with an
+ * unrelated ASCII character on cfltk's side. */
+static int vk_to_fl_key(WPARAM vk) {
+    switch (vk) {
+        case VK_BACK: return FL_BackSpace;
+        case VK_TAB: return FL_Tab;
+        case VK_RETURN: return FL_Enter;
+        case VK_ESCAPE: return FL_Escape;
+        case VK_LEFT: return FL_Left;
+        case VK_UP: return FL_Up;
+        case VK_RIGHT: return FL_Right;
+        case VK_DOWN: return FL_Down;
+        case VK_HOME: return FL_Home;
+        case VK_END: return FL_End;
+        case VK_INSERT: return FL_Insert;
+        case VK_DELETE: return FL_Delete;
+        case VK_PRIOR: return FL_Page_Up;
+        case VK_NEXT: return FL_Page_Down;
+        default: return 0;
+    }
+}
 
 static int translate_button_state(WPARAM wparam) {
     /* Unlike real Win32, this microwindows tree's mouse messages don't
@@ -103,6 +138,27 @@ LRESULT CALLBACK fl_nx_wndproc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam
                                         translate_button_state(wparam), 0, NULL, 0);
             Fl_context_handle(FL_MOVE, win);
             return 0;
+
+        case WM_CHAR: {
+            char ch = (char)wparam;
+            win = fl_nx_find_window(hwnd);
+            if (!win) break;
+            fl_backend_set_event_state(0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                        translate_button_state(0), (int)wparam, &ch, 1);
+            Fl_context_handle(FL_KEYDOWN, win);
+            return 0;
+        }
+
+        case WM_KEYDOWN:
+        case WM_KEYUP: {
+            int fl_key = vk_to_fl_key(wparam);
+            win = fl_nx_find_window(hwnd);
+            if (!win || !fl_key) break; /* printable keys already handled via WM_CHAR above */
+            fl_backend_set_event_state(0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                        translate_button_state(0), fl_key, NULL, 0);
+            Fl_context_handle(msg == WM_KEYDOWN ? FL_KEYDOWN : FL_KEYUP, win);
+            return 0;
+        }
 
         case WM_SETFOCUS:
         case WM_KILLFOCUS:
