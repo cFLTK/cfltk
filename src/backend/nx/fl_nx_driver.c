@@ -5,14 +5,14 @@
  * Fl_Graphics_Driver (see cfltk/fl_draw.h). Modeled on
  * fl_x11_driver.c's structure.
  *
- * First-milestone scope: solid colors, clipping (single-rectangle
- * stack, same simplification the X11 backend itself makes), and the
- * line/rect/arc/polygon primitives. Text/font measurement and drawing,
- * raw image blit/read-back, bitmask stipple, and offscreen surfaces
- * are honest no-op/best-guess stubs, not silently wrong: see each
- * one's own comment below. None of them are reachable from a bare
- * Fl_Window with no label or child widgets, which is as far as this
- * milestone needs to go.
+ * Solid colors, clipping (single-rectangle stack, same simplification
+ * the X11 backend itself makes), line/rect/arc/polygon primitives,
+ * text/font, and offscreen surfaces (fl_nx_offscreen.c, wired in at
+ * the bottom of this file) are all implemented. Raw image blit/
+ * read-back and bitmask stipple remain honest no-op stubs -- see each
+ * one's own comment below -- pending the image-decoders milestone;
+ * neither is reachable from a bare Fl_Window/Fl_Double_Window with no
+ * image widgets.
  */
 #include <nuttx/config.h> /* must be first -- see fl_nx_window.c's comment */
 #include <math.h>
@@ -392,20 +392,6 @@ static void d_draw_bitmask(const unsigned char *bits, int bmp_w, int bmp_h, int 
     (void)bits; (void)bmp_w; (void)bmp_h; (void)cx; (void)cy; (void)x; (void)y; (void)w; (void)h;
 }
 
-/* ------------------------------------------------------------------ */
-/* Offscreen surfaces -- NOT YET IMPLEMENTED (see fl_nx_window.c's     */
-/* fl_backend_window_flush(): double buffering isn't wired up yet      */
-/* either, so nothing in this milestone calls these).                  */
-/* ------------------------------------------------------------------ */
-
-static Fl_Offscreen d_create_offscreen(int w, int h) { (void)w; (void)h; return (Fl_Offscreen)0; }
-static void d_delete_offscreen(Fl_Offscreen o) { (void)o; }
-static void d_begin_offscreen(Fl_Offscreen o) { (void)o; }
-static void d_end_offscreen(void) {}
-static void d_copy_offscreen(int x, int y, int w, int h, Fl_Offscreen o, int srcx, int srcy) {
-    (void)x; (void)y; (void)w; (void)h; (void)o; (void)srcx; (void)srcy;
-}
-
 static const Fl_Graphics_Driver g_driver = {
     d_color_index, d_color_rgb, d_current_color,
     d_push_clip, d_push_no_clip, d_pop_clip, d_not_clipped, d_clip_box,
@@ -418,8 +404,8 @@ static const Fl_Graphics_Driver g_driver = {
     d_draw_bitmask,
     d_fill_polygon, d_draw_polyline,
     d_text_extents,
-    d_create_offscreen, d_delete_offscreen, d_begin_offscreen,
-    d_end_offscreen, d_copy_offscreen,
+    fl_nx_create_offscreen, fl_nx_delete_offscreen, fl_nx_begin_offscreen,
+    fl_nx_end_offscreen, fl_nx_copy_offscreen,
     d_scroll_blit
 };
 

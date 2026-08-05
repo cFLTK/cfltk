@@ -8,10 +8,9 @@
  * (Win32-compatible) rather than the raw engine or the Nano-X
  * client/server protocol.
  *
- * First-milestone scope (empty/blank window only): no double
- * buffering, no drag-and-drop, no resize hints, no real screen DPI,
- * no beep -- each documented at its stub below rather than silently
- * omitted. Matches the X11 backend's own precedent of a "known
+ * Known gaps, each documented at its own stub below rather than
+ * silently omitted: no drag-and-drop, no resize hints, no real screen
+ * DPI, no beep. Matches the X11 backend's own precedent of a "known
  * differences" banner instead of pretending these are done.
  */
 #include <nuttx/config.h> /* must be the first include in any NuttX
@@ -87,6 +86,29 @@ Fl_Window *fl_nx_find_window(HWND hwnd) {
     return NULL;
 }
 
+/* (Re)creates the offscreen draw buffer at the window's current size --
+ * called on create()/flush() (first size) and whenever the window is
+ * resized. The old buffer's *contents* are not preserved (matches the
+ * X11 backend's own resize_offscreen(): a resized double-buffered
+ * window redraws its full contents anyway, via the resize->damage-all
+ * path already in Fl_Group_resize()). */
+static void resize_offscreen(Fl_NX_Window *nw, int width, int height) {
+    if (width < 1) width = 1;
+    if (height < 1) height = 1;
+    if (nw->offscreen_bmp && nw->offscreen_w == width && nw->offscreen_h == height) return;
+
+    if (nw->offscreen_bmp) {
+        DeleteObject(nw->offscreen_bmp);
+        DeleteDC(nw->offscreen_hdc);
+    }
+    nw->offscreen_hdc = CreateCompatibleDC(nw->real_hdc);
+    nw->offscreen_bmp = CreateCompatibleBitmap(nw->real_hdc, width, height);
+    SelectObject(nw->offscreen_hdc, nw->offscreen_bmp);
+    nw->offscreen_w = width;
+    nw->offscreen_h = height;
+    nw->hdc = nw->offscreen_hdc;
+}
+
 void fl_backend_window_create(Fl_Window *win) {
     Fl_NX_Window *nw;
     Fl_Widget *w = FL_WIDGET(win);
@@ -98,7 +120,13 @@ void fl_backend_window_create(Fl_Window *win) {
 
     nw->hwnd = CreateWindowEx(0, k_window_class, label ? label : "", style,
                                x, y, width, height, HWND_DESKTOP, NULL, 0, NULL);
-    nw->hdc = GetDC(nw->hwnd);
+    nw->real_hdc = GetDC(nw->hwnd);
+
+    if (win->double_buffered) {
+        resize_offscreen(nw, width, height);
+    } else {
+        nw->hdc = nw->real_hdc;
+    }
 
     win->backend_data = nw;
 }
@@ -131,7 +159,11 @@ void fl_backend_window_hide(Fl_Window *win) {
 void fl_backend_window_destroy(Fl_Window *win) {
     Fl_NX_Window *nw = fl_nx_window_data(win);
     if (!nw) return;
-    ReleaseDC(nw->hwnd, nw->hdc);
+    if (nw->offscreen_bmp) {
+        DeleteObject(nw->offscreen_bmp);
+        DeleteDC(nw->offscreen_hdc);
+    }
+    ReleaseDC(nw->hwnd, nw->real_hdc);
     DestroyWindow(nw->hwnd);
     free(nw);
     win->backend_data = NULL;
@@ -140,8 +172,12 @@ void fl_backend_window_destroy(Fl_Window *win) {
 void fl_backend_window_reshape(Fl_Window *win) {
     Fl_NX_Window *nw = fl_nx_window_data(win);
     Fl_Widget *w = FL_WIDGET(win);
+    int width, height;
     if (!nw) return;
-    MoveWindow(nw->hwnd, w->x, w->y, w->w > 0 ? w->w : 1, w->h > 0 ? w->h : 1, TRUE);
+    width = w->w > 0 ? w->w : 1;
+    height = w->h > 0 ? w->h : 1;
+    MoveWindow(nw->hwnd, w->x, w->y, width, height, TRUE);
+    if (win->double_buffered) resize_offscreen(nw, width, height);
 }
 
 void fl_backend_window_relabel(Fl_Window *win) {
@@ -166,17 +202,21 @@ void fl_backend_window_resize_hints(Fl_Window *win) {
 
 void fl_backend_window_flush(Fl_Window *win) {
     Fl_NX_Window *nw = fl_nx_window_data(win);
+    Fl_Widget *w = FL_WIDGET(win);
     if (!nw) return;
 
-    /* No double buffering yet: draws straight into the window's HDC.
-     * Fine for a single flat-color window; will show partial-redraw
-     * flicker once real widget content lands. Follow-up milestone
-     * alongside fl_nx_driver.c's offscreen stubs. */
+    if (win->double_buffered)
+        resize_offscreen(nw, w->w > 0 ? w->w : 1, w->h > 0 ? w->h : 1);
+
     fl_nx_current_target = nw;
     fl_push_no_clip();
     Fl_Widget_draw(FL_WIDGET(win));
     fl_pop_clip();
     fl_nx_current_target = NULL;
+
+    if (win->double_buffered)
+        BitBlt(nw->real_hdc, 0, 0, nw->offscreen_w, nw->offscreen_h,
+               nw->offscreen_hdc, 0, 0, SRCCOPY);
 }
 
 void fl_backend_grab(Fl_Window *win) {

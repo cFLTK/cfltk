@@ -32,13 +32,32 @@
 #include "cfltk/fl_colormap.h"
 
 typedef struct Fl_NX_Window {
+    /* Current draw target -- every Fl_Graphics_Driver call in
+     * fl_nx_driver.c targets this hdc. Equal to real_hdc for an
+     * ordinary (single-buffered) window; for a double-buffered window
+     * (Fl_Double_Window) this instead points at offscreen_hdc for the
+     * duration of drawing, and fl_backend_window_flush() BitBlt()s
+     * offscreen_hdc onto real_hdc afterward -- same real_xid/offscreen
+     * split fl_x11_window.c's Fl_X11_Window uses, just with mwin's
+     * CreateCompatibleDC/CreateCompatibleBitmap standing in for
+     * XCreatePixmap. */
     HWND hwnd;
-    HDC hdc; /* obtained once at create time, held for the window's
-              * life (mirrors the X11 backend's persistent GC) rather
-              * than a per-WM_PAINT GetDC/ReleaseDC pair -- cfltk's
-              * Fl_Graphics_Driver calls draw primitives from
-              * fl_backend_window_flush(), not from inside a WndProc's
-              * WM_PAINT handler. */
+    HDC hdc;
+
+    /* The window's own device context: obtained once at create time,
+     * held for the window's life (mirrors the X11 backend's persistent
+     * GC) rather than a per-WM_PAINT GetDC/ReleaseDC pair -- cfltk's
+     * Fl_Graphics_Driver calls draw primitives from
+     * fl_backend_window_flush(), not from inside a WndProc's WM_PAINT
+     * handler. Always valid; used as the final BitBlt() destination
+     * for a double-buffered window. */
+    HDC real_hdc;
+
+    /* Double-buffering (Fl_Double_Window only). offscreen_hdc==NULL
+     * means single-buffered (hdc==real_hdc). */
+    HDC offscreen_hdc;
+    HBITMAP offscreen_bmp;
+    int offscreen_w, offscreen_h;
 } Fl_NX_Window;
 
 extern int fl_nx_screen_w, fl_nx_screen_h;
@@ -59,5 +78,13 @@ Fl_Window *fl_nx_find_window(HWND hwnd); /* fl_nx_event.c */
  * fl_backend_init(); translates WM_* messages and dispatches them into
  * Fl_context_handle(). */
 LRESULT CALLBACK fl_nx_wndproc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
+
+/* fl_nx_offscreen.c -- see include/cfltk/fl_draw.h for the public
+ * fl_create_offscreen()/... wrappers these back. */
+Fl_Offscreen fl_nx_create_offscreen(int w, int h);
+void fl_nx_delete_offscreen(Fl_Offscreen o);
+void fl_nx_begin_offscreen(Fl_Offscreen o);
+void fl_nx_end_offscreen(void);
+void fl_nx_copy_offscreen(int x, int y, int w, int h, Fl_Offscreen o, int srcx, int srcy);
 
 #endif /* CFLTK_NX_INTERNAL_H */
