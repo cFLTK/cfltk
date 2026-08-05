@@ -259,34 +259,118 @@ static void d_scroll_blit(int src_x, int src_y, int src_w, int src_h, int dest_x
 }
 
 /* ------------------------------------------------------------------ */
-/* Fonts / text -- NOT YET IMPLEMENTED.                                 */
+/* Fonts / text                                                        */
 /*                                                                      */
-/* mwin's own font API (winfont.h: CreateFont/SelectObject(HFONT)/     */
-/* TextOut/GetTextExtentPoint32) is real and could back this properly, */
-/* but doing it right needs its own investigation pass (font          */
-/* selection matching cfltk's Fl_Font/Fl_Fontsize model, the same way */
-/* fl_x11_driver.c's load_font() maps them onto fontconfig patterns). */
-/* Deliberately NOT guessed at here: draw_text() below draws nothing  */
-/* rather than drawing something plausible-looking but wrong, and the */
-/* size functions return small fixed placeholders so layout code that */
-/* divides by height/width doesn't divide by zero -- neither is a     */
-/* real implementation. A window with a label or any text widget will */
-/* show blank space where the text should be until this is done.      */
+/* Backed by mwin's own font API (winfont.h): CreateFont() selects a   */
+/* built-in compiled bitmap font by generic family (FF_SWISS/FF_ROMAN/ */
+/* FF_MODERN) + weight + italic, the same three-family/bold/italic     */
+/* model fl_x11_driver.c's load_font() maps onto fontconfig patterns   */
+/* -- an empty facename ("") is passed deliberately, letting mwin's    */
+/* own matching pick the closest compiled font for the requested       */
+/* family/weight/style rather than guessing at this tree's internal    */
+/* bitmap-font resource names (winFreeSansSerif11x13 and friends,      */
+/* never meant to be referenced directly by callers).                  */
+/*                                                                      */
+/* Known gap: GetTextExtentPoint() only reports advance width, not a   */
+/* separate ink-box bounding rect the way Xft's XGlyphInfo does, so    */
+/* text_extents() below reports (dx,dy)=(0,0) rather than a real ink   */
+/* offset -- fine for simple left-to-right layout, would under/over-   */
+/* estimate a tightly cropped selection highlight around an italic     */
+/* glyph with overhang. Not reachable from cfltk_hello (no widgets).   */
 /* ------------------------------------------------------------------ */
+
+#define FONT_CACHE_SIZE 64
+typedef struct { Fl_Font face; Fl_Fontsize size; HFONT hfont; } FontCacheEntry;
+static FontCacheEntry g_font_cache[FONT_CACHE_SIZE];
+static int g_font_cache_count = 0;
+
+static int font_family_flag(Fl_Font face) {
+    if (face >= FL_FREE_FONT) return FF_SWISS;
+    switch (face & ~3) {
+        case FL_COURIER: return FF_MODERN;
+        case FL_TIMES: return FF_ROMAN;
+        default: return FF_SWISS;
+    }
+}
+static int font_is_bold(Fl_Font face) {
+    return ((face >= FL_HELVETICA && face <= FL_TIMES_BOLD_ITALIC) || face >= FL_FREE_FONT) && (face & 1);
+}
+static int font_is_italic(Fl_Font face) {
+    return ((face >= FL_HELVETICA && face <= FL_TIMES_BOLD_ITALIC) || face >= FL_FREE_FONT) && (face & 2);
+}
+
+static HFONT load_font(Fl_Font face, Fl_Fontsize size) {
+    int i;
+    HFONT f;
+    int height = size > 0 ? size : 14;
+
+    for (i = 0; i < g_font_cache_count; i++)
+        if (g_font_cache[i].face == face && g_font_cache[i].size == size) return g_font_cache[i].hfont;
+
+    f = CreateFont(height, 0, 0, 0, font_is_bold(face) ? FW_BOLD : FW_NORMAL,
+                    font_is_italic(face), FALSE, FALSE, 0, 0, 0, 0,
+                    DEFAULT_PITCH | font_family_flag(face), "");
+
+    if (g_font_cache_count < FONT_CACHE_SIZE) {
+        g_font_cache[g_font_cache_count].face = face;
+        g_font_cache[g_font_cache_count].size = size;
+        g_font_cache[g_font_cache_count].hfont = f;
+        g_font_cache_count++;
+    }
+    return f;
+}
 
 static void d_font(Fl_Font face, Fl_Fontsize size) { g_current_font = face; g_current_size = size; }
 static Fl_Font d_current_font(void) { return g_current_font; }
 static Fl_Fontsize d_current_size(void) { return g_current_size; }
-static int d_height(void) { return g_current_size > 0 ? g_current_size + 2 : 16; }
-static int d_descent(void) { return g_current_size > 0 ? g_current_size / 4 : 4; }
-static double d_width(const char *text, int n) {
-    if (!text || n <= 0) return 0.0;
-    return (double)n * (double)(g_current_size > 0 ? g_current_size : 14) * 0.6;
+
+static int d_height(void) {
+    HDC hdc;
+    TEXTMETRIC tm;
+    if (!fl_nx_current_target) return g_current_size > 0 ? g_current_size + 2 : 16;
+    hdc = fl_nx_current_target->hdc;
+    SelectObject(hdc, load_font(g_current_font, g_current_size));
+    GetTextMetrics(hdc, &tm);
+    return (int)(tm.tmAscent + tm.tmDescent);
 }
-static void d_draw_text(const char *str, int n, int x, int y) { (void)str; (void)n; (void)x; (void)y; }
+static int d_descent(void) {
+    HDC hdc;
+    TEXTMETRIC tm;
+    if (!fl_nx_current_target) return g_current_size > 0 ? g_current_size / 4 : 4;
+    hdc = fl_nx_current_target->hdc;
+    SelectObject(hdc, load_font(g_current_font, g_current_size));
+    GetTextMetrics(hdc, &tm);
+    return (int)tm.tmDescent;
+}
+static double d_width(const char *text, int n) {
+    SIZE sz;
+    if (!fl_nx_current_target || !text || n <= 0) return 0.0;
+    SelectObject(fl_nx_current_target->hdc, load_font(g_current_font, g_current_size));
+    GetTextExtentPoint(fl_nx_current_target->hdc, text, n, &sz);
+    return (double)sz.cx;
+}
+static void d_draw_text(const char *str, int n, int x, int y) {
+    HDC hdc;
+    TEXTMETRIC tm;
+    if (!fl_nx_current_target || !str || n <= 0) return;
+    hdc = fl_nx_current_target->hdc;
+    SelectObject(hdc, load_font(g_current_font, g_current_size));
+    SetBkMode(hdc, TRANSPARENT);
+    /* cfltk's (x,y) is the text baseline (matches Xft's convention,
+     * which d_draw_text's X11 sibling passes straight through);
+     * TextOut's is the top-left corner, so shift up by the ascent. */
+    GetTextMetrics(hdc, &tm);
+    TextOut(hdc, x, y - (int)tm.tmAscent, str, n);
+}
 static void d_text_extents(const char *text, int n, int *dx, int *dy, int *w, int *h) {
-    (void)text; (void)n;
-    *dx = 0; *dy = 0; *w = 0; *h = 0;
+    SIZE sz;
+    if (!fl_nx_current_target || !text || n <= 0) { *dx = *dy = *w = *h = 0; return; }
+    SelectObject(fl_nx_current_target->hdc, load_font(g_current_font, g_current_size));
+    GetTextExtentPoint(fl_nx_current_target->hdc, text, n, &sz);
+    *dx = 0;
+    *dy = 0;
+    *w = sz.cx;
+    *h = sz.cy;
 }
 
 /* ------------------------------------------------------------------ */
