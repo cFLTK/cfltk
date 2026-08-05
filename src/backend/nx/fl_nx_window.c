@@ -9,9 +9,10 @@
  * client/server protocol.
  *
  * Known gaps, each documented at its own stub below rather than
- * silently omitted: no drag-and-drop, no resize hints, no real screen
- * DPI, no beep. Matches the X11 backend's own precedent of a "known
- * differences" banner instead of pretending these are done.
+ * silently omitted: no resize hints, no real screen DPI, no beep.
+ * Matches the X11 backend's own precedent of a "known differences"
+ * banner instead of pretending these are done. Drag-and-drop is
+ * implemented, in fl_nx_dnd.c.
  */
 #include <nuttx/config.h> /* must be the first include in any NuttX
                             * source file -- see NuttX's own coding
@@ -260,11 +261,4 @@ void fl_backend_beep(int type) {
      * failing -- matches Fl_beep()'s documented "may do nothing on
      * some platforms" contract. */
     (void)type;
-}
-
-int fl_backend_dnd_start(const char *text, int len) {
-    /* No drag-and-drop protocol implemented yet for this backend. */
-    (void)text;
-    (void)len;
-    return 0;
 }
