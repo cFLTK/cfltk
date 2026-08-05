@@ -79,6 +79,12 @@ Fl_Window *fl_nx_find_window(HWND hwnd); /* fl_nx_event.c */
  * Fl_context_handle(). */
 LRESULT CALLBACK fl_nx_wndproc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
 
+/* fl_nx_event.c -- creates the hidden message-only window that
+ * Fl_add_fd()'s MwRegisterFdInput()/Output()/Except() and
+ * fl_backend_wait()'s bounded-wait SetTimer() both target. Called
+ * once from fl_backend_init(). */
+void fl_nx_fdwatch_init(void);
+
 /* fl_nx_offscreen.c -- see include/cfltk/fl_draw.h for the public
  * fl_create_offscreen()/... wrappers these back. */
 Fl_Offscreen fl_nx_create_offscreen(int w, int h);

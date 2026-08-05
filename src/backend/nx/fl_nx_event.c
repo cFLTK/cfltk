@@ -22,12 +22,23 @@
  * have a full VK_* table (an earlier pass of this comment claimed
  * otherwise off an incomplete search; not true).
  *
- * Click-multiplicity (double/triple-click) tracking, drag-and-drop,
- * and Fl_add_fd()/Fl_remove_fd() timers (present in the X11 backend)
- * are not yet ported. Each is a real, separate follow-up, not
- * silently dropped.
+ * Click-multiplicity (double/triple-click) tracking and drag-and-drop
+ * (present in the X11 backend) are not yet ported. Each is a real,
+ * separate follow-up, not silently dropped.
+ *
+ * Fl_add_fd()/timers (bottom of this file) are implemented against
+ * mwin's own fd-watch primitives (MwRegisterFdInput()/Output()/
+ * Except(), src/mwin/winmain.c's MwSelect()) and SetTimer()/WM_TIMER,
+ * rather than reimplementing select() the way fl_x11_event.c does
+ * around Xlib's raw connection fd: mwin's message pump already does
+ * exactly that internally (GetMessage() -> MwSelect(TRUE), which
+ * select()s across the mouse/keyboard fds *and* every
+ * MwRegisterFd*()-registered fd in one call), so this backend rides
+ * that existing mechanism instead of building a second one next to it.
  */
 #include <nuttx/config.h> /* must be first -- see fl_nx_window.c's comment */
+#include <string.h>
+
 #include "fl_nx_internal.h"
 #include "../fl_backend.h"
 #include "cfltk/Fl.h"
@@ -188,57 +199,163 @@ int fl_backend_ready(void) {
     return PeekMessage(&msg, NULL, 0, 0, PM_NOREMOVE) ? 1 : 0;
 }
 
+/* -------------------------------------------------------------------
+ * fd watching (Fl_add_fd()/Fl_remove_fd(), see Fl.h) and the bounded
+ * wait fl_backend_wait() needs to serve Fl_add_timeout() correctly.
+ *
+ * g_fdwatch_hwnd is a hidden, never-shown top-level window that exists
+ * purely as a message target: MwRegisterFdInput()/Output()/Except()
+ * (winmain.c) take an HWND to PostMessage() a WM_FDINPUT/WM_FDOUTPUT/
+ * WM_FDEXCEPT to (wParam == the ready fd) once MwSelect() sees that fd
+ * become ready; SetTimer()/KillTimer() (winuser.c) target the same
+ * window to bound fl_backend_wait()'s blocking GetMessage() call to
+ * `timeout_secs`, since mwin has no "GetMessage with an explicit max
+ * wait" call of its own -- SetTimer()+WM_TIMER is the standard Win32
+ * way to get one. One shared window (rather than, say, the first
+ * cfltk Fl_Window) keeps fd-watch/timer lifetime independent of
+ * however many real windows the app opens or closes.
+ * ------------------------------------------------------------------- */
+
+#define FL_FD_MAX 64
+typedef struct { int fd; int when; Fl_FD_Handler *cb; void *data; int active; } Fl_FD_Slot;
+static Fl_FD_Slot g_fds[FL_FD_MAX];
+
+static const char k_fdwatch_class[] = "CfltkFdWatch";
+static HWND g_fdwatch_hwnd = NULL;
+
+/* The one-shot bound on fl_backend_wait()'s GetMessage() call below --
+ * scoped to g_fdwatch_hwnd, so this can't collide with a timer id an
+ * application itself passes to SetTimer() on one of its own windows. */
+#define FL_WAIT_TIMER_ID 1
+
+static LRESULT CALLBACK fl_nx_fdwatch_wndproc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
+    int i;
+    switch (msg) {
+        case WM_FDINPUT:
+        case WM_FDOUTPUT:
+        case WM_FDEXCEPT: {
+            int when = msg == WM_FDINPUT ? FL_READ : msg == WM_FDOUTPUT ? FL_WRITE : FL_EXCEPT;
+            int fd = (int)wparam;
+            for (i = 0; i < FL_FD_MAX; i++) {
+                if (g_fds[i].active && g_fds[i].fd == fd && (g_fds[i].when & when)) {
+                    g_fds[i].cb(fd, g_fds[i].data);
+                    break;
+                }
+            }
+            return 0;
+        }
+        case WM_TIMER:
+            /* fl_backend_wait()'s own bound firing -- nothing to do,
+             * GetMessage() returning at all is the entire point. */
+            return 0;
+        default:
+            return DefWindowProc(hwnd, msg, wparam, lparam);
+    }
+}
+
+void fl_nx_fdwatch_init(void) {
+    WNDCLASS wc;
+
+    if (g_fdwatch_hwnd) return;
+
+    memset(&wc, 0, sizeof(wc));
+    wc.lpfnWndProc = fl_nx_fdwatch_wndproc;
+    wc.lpszClassName = k_fdwatch_class;
+    RegisterClass(&wc);
+
+    g_fdwatch_hwnd = CreateWindowEx(0, k_fdwatch_class, "", WS_POPUP,
+                                     0, 0, 1, 1, HWND_DESKTOP, NULL, 0, NULL);
+    /* Deliberately never ShowWindow()'d -- a message target only. */
+}
+
+void Fl_add_fd(int fd, int when, Fl_FD_Handler *cb, void *data) {
+    int i;
+    if (fd < 0) return;
+    for (i = 0; i < FL_FD_MAX; i++) {
+        if (!g_fds[i].active) {
+            g_fds[i].active = 1;
+            g_fds[i].fd = fd;
+            g_fds[i].when = when;
+            g_fds[i].cb = cb;
+            g_fds[i].data = data;
+            break;
+        }
+    }
+    /* Pool exhausted: silently dropped, same policy as Fl_add_timeout(). */
+    if (when & FL_READ) MwRegisterFdInput(g_fdwatch_hwnd, fd);
+    if (when & FL_WRITE) MwRegisterFdOutput(g_fdwatch_hwnd, fd);
+    if (when & FL_EXCEPT) MwRegisterFdExcept(g_fdwatch_hwnd, fd);
+}
+
+void Fl_remove_fd(int fd, int when) {
+    int i;
+    if (fd < 0) return;
+    if (when & FL_READ) MwUnregisterFdInput(g_fdwatch_hwnd, fd);
+    if (when & FL_WRITE) MwUnregisterFdOutput(g_fdwatch_hwnd, fd);
+    if (when & FL_EXCEPT) MwUnregisterFdExcept(g_fdwatch_hwnd, fd);
+    for (i = 0; i < FL_FD_MAX; i++) {
+        if (g_fds[i].active && g_fds[i].fd == fd) {
+            g_fds[i].when &= ~when;
+            if (g_fds[i].when == 0) g_fds[i].active = 0;
+        }
+    }
+}
+
 int fl_backend_wait(double timeout_secs) {
     MSG msg;
     int dispatched = 0;
 
+    /* Drain whatever's already queued first -- matches the X11
+     * backend's own "drain, and if that alone found something, skip
+     * the actual wait" shape. */
+    while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+        dispatched = 1;
+    }
+    if (dispatched) return 1;
+
+    if (timeout_secs < 1e10 && timeout_secs <= 0.0) {
+        /* Non-blocking poll (Fl_check()-style): nothing was queued,
+         * and the caller explicitly asked not to wait for more. */
+        return 0;
+    }
+
     if (timeout_secs >= 1e10) {
         /* "Block forever" case: mwin's GetMessage() itself blocks
-         * until a message arrives, so this is a real blocking wait,
-         * not a busy poll. */
+         * until a message arrives (mouse/keyboard/fd-ready/WM_TIMER),
+         * so this is a real blocking wait, not a busy poll. */
         if (GetMessage(&msg, NULL, 0, 0)) {
             TranslateMessage(&msg);
             DispatchMessage(&msg);
             dispatched = 1;
         }
-        return dispatched;
+    } else {
+        /* Bounded wait: SetTimer() gives GetMessage() an upper bound
+         * via WM_TIMER, since mwin has no direct "wait up to N ms"
+         * primitive of its own. round up to at least 1ms so a small
+         * positive timeout can't collapse into an unbounded wait. */
+        UINT ms = (UINT)(timeout_secs * 1000.0 + 0.5);
+        if (ms < 1) ms = 1;
+        SetTimer(g_fdwatch_hwnd, FL_WAIT_TIMER_ID, ms, NULL);
+        if (GetMessage(&msg, NULL, 0, 0)) {
+            int is_our_timeout = msg.hwnd == g_fdwatch_hwnd &&
+                                  msg.message == WM_TIMER &&
+                                  msg.wParam == FL_WAIT_TIMER_ID;
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+            if (!is_our_timeout) dispatched = 1;
+        }
+        KillTimer(g_fdwatch_hwnd, FL_WAIT_TIMER_ID);
     }
 
-    /* Timed/non-blocking case: mwin's PeekMessage() has no timeout
-     * parameter of its own, so this drains whatever is already queued
-     * without actually sleeping up to timeout_secs. Good enough for a
-     * blank window's own show/close cycle; a real timed wait is a
-     * Timers-milestone follow-up (see fl_x11_event.c's select()-based
-     * version for the shape it should take here once Fl_add_fd()/
-     * timers exist on this backend too). */
+    /* Whatever arrived may have unblocked more than one message
+     * (e.g. mwin posting both WM_MOUSEMOVE and a follow-up paint) --
+     * drain the rest before returning, same as the initial pass. */
     while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
         dispatched = 1;
     }
     return dispatched;
-}
-
-/* Fl_add_fd()/Fl_remove_fd() -- NOT YET IMPLEMENTED.
- *
- * These aren't optional the way text rendering or images are: cfltk's
- * core (Fl.c's Fl_lock()/Fl_awake() self-pipe wakeup mechanism) calls
- * Fl_add_fd() unconditionally, so *something* has to exist here for
- * the link to succeed at all, even for an app that never touches
- * threading itself -- which is why this is a stub rather than an
- * omission. A real implementation needs fl_backend_wait() to select()
- * across watched fds the same way fl_x11_event.c's version does
- * (see its own g_fds[] registry), interleaved with mwin's message
- * pump -- worth doing together with real timer support (Fl_add_
- * timeout()), not before. Until then: no fd is ever actually watched,
- * so a worker thread calling Fl_awake() from off the main thread will
- * not wake a blocked fl_backend_wait(1e20) the way it does on X11 --
- * only relevant once this backend has a threaded app to run, which
- * the empty-window milestone does not. */
-void Fl_add_fd(int fd, int when, Fl_FD_Handler *cb, void *data) {
-    (void)fd; (void)when; (void)cb; (void)data;
-}
-
-void Fl_remove_fd(int fd, int when) {
-    (void)fd; (void)when;
 }

@@ -61,6 +61,7 @@ int fl_backend_init(void) {
     fl_nx_screen_h = GetSystemMetrics(SM_CYSCREEN);
 
     fl_nx_driver_init();
+    fl_nx_fdwatch_init();
 
     g_initialized = 1;
     return 1;
