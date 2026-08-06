@@ -16,6 +16,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h> /* strcasecmp(), used by Fl_set_font_family() */
 
 #include "fl_nx_internal.h"
 
@@ -282,6 +283,52 @@ static void d_scroll_blit(int src_x, int src_y, int src_w, int src_h, int dest_x
 typedef struct { Fl_Font face; Fl_Fontsize size; HFONT hfont; } FontCacheEntry;
 static FontCacheEntry g_font_cache[FONT_CACHE_SIZE];
 static int g_font_cache_count = 0;
+
+/* Custom families registered via Fl_set_font_family(), one entry per
+ * 4-slot block starting at FL_FREE_FONT (regular/bold/italic/bold-
+ * italic) -- same packing scheme fl_x11_driver.c's own
+ * Fl_set_font_family() uses, and the one font_family_flag()/
+ * font_is_bold()/font_is_italic() below already decode generically
+ * for any face >= FL_FREE_FONT. The name itself is intentionally not
+ * threaded through to CreateFont() (see the "empty facename" note
+ * above load_font()) -- mwin's own family/weight/style matching picks
+ * the closest compiled font regardless of the specific name, same as
+ * every other >= FL_FREE_FONT face already gets FF_SWISS. Allocating
+ * a real, distinct ID per name (rather than always returning
+ * FL_HELVETICA) still matters: callers compare returned Fl_Font
+ * values for equality/caching, and dw's own style engine relies on
+ * that per-name identity even though this backend renders all of them
+ * identically today. */
+#define CUSTOM_FONT_FAMILIES_MAX 64
+static char *g_custom_families[CUSTOM_FONT_FAMILIES_MAX];
+static int g_custom_family_count = 0;
+
+Fl_Font Fl_set_font_family(const char *name) {
+    int i;
+    if (!name || !*name) name = "sans";
+    for (i = 0; i < g_custom_family_count; i++) {
+        if (strcasecmp(g_custom_families[i], name) == 0)
+            return FL_FREE_FONT + i * 4;
+    }
+    if (g_custom_family_count >= CUSTOM_FONT_FAMILIES_MAX)
+        return FL_HELVETICA; /* table full: fall back to a safe builtin */
+    g_custom_families[g_custom_family_count] = strdup(name);
+    return FL_FREE_FONT + (g_custom_family_count++) * 4;
+}
+
+/* Unlike fl_x11_driver's real fontconfig existence check, mwin has no
+ * font-family enumeration/lookup API at all in this tree -- every
+ * face this backend loads (builtin or custom, see load_font() below)
+ * resolves through the same generic family/weight/style matching with
+ * an empty facename, so there is no way to distinguish "genuinely
+ * installed" from "silently substituted" the way Xft/fontconfig can.
+ * Always claiming success is the honest answer for this backend's
+ * actual matching model (substitution never fails here either), not a
+ * stub standing in for unfinished work. */
+int Fl_font_family_exists(const char *name) {
+    (void)name;
+    return 1;
+}
 
 static int font_family_flag(Fl_Font face) {
     if (face >= FL_FREE_FONT) return FF_SWISS;

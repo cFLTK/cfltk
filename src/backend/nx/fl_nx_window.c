@@ -262,3 +262,36 @@ void fl_backend_beep(int type) {
      * some platforms" contract. */
     (void)type;
 }
+
+/* ------------------------------------------------------------------ */
+/* Cursor shapes (Fl_Window_set_cursor())                              */
+/* ------------------------------------------------------------------ */
+
+void Fl_Window_set_cursor(Fl_Window *self, Fl_Cursor c) {
+    /* mwin declares SetCursor()/LoadCursor() in winuser.h but both are
+     * commented "not yet implemented" in this Microwindows tree --
+     * there is no working cursor-shape API to call into here at all,
+     * unlike fl_x11_driver's real XDefineCursor(). A silent no-op
+     * (rather than a crash or a build failure) is the correct behavior
+     * until mwin itself grows a real implementation; matches
+     * fl_backend_beep()'s "documented gap, not a bug" shape. */
+    (void)self;
+    (void)c;
+}
+
+/* ------------------------------------------------------------------ */
+/* Default window class (Fl_Window_default_xclass())                   */
+/* ------------------------------------------------------------------ */
+
+/* Real, stateful (not a stub): mwin/NuttX has no WM_CLASS-equivalent
+ * concept to actually apply this to, but the getter/setter contract
+ * itself is portable and cheap to honor for real, same as
+ * fl_x11_window.c's own g_default_xclass. */
+static char *g_default_xclass = NULL;
+
+void Fl_Window_default_xclass(const char *xc) {
+    free(g_default_xclass);
+    g_default_xclass = xc ? strdup(xc) : NULL;
+}
+
+const char *Fl_Window_default_xclass_get(void) { return g_default_xclass; }
